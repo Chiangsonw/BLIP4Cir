@@ -15,10 +15,13 @@ from torch import optim, nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from data_utils import base_path, squarepad_transform, targetpad_transform, CIRRDataset, FashionIQDataset
+from data_utils import base_path, squarepad_transform, targetpad_transform, CIRRDataset, FashionIQDataset, CIRRDatasetBLIP
 from utils import collate_fn, update_train_running_results, set_train_bar_description, extract_index_features, \
     save_model, generate_randomized_fiq_caption, element_wise_sum, device
 from validate import compute_cirr_val_metrics, compute_fiq_val_metrics
+
+
+from lavis.models import load_model_and_preprocess
 
 
 def clip_finetune_fiq(train_dress_types: List[str], val_dress_types: List[str],
@@ -255,50 +258,55 @@ def clip_finetune_cirr(num_epochs: int, clip_model_name: str, learning_rate: flo
     with open(training_path / "training_hyperparameters.json", 'w+') as file:
         json.dump(training_hyper_params, file, sort_keys=True, indent=4)
 
-    clip_model, clip_preprocess = clip.load(clip_model_name, device=device, jit=False)
+    # clip_model, clip_preprocess = clip.load(clip_model_name, device=device, jit=False)
+
+    blip_model, vis_processors, txt_processors = load_model_and_preprocess(name="blip2_feature_extractor", model_type="pretrain", is_eval=True, device=device)
+
 
     if encoder == 'text':
-        print('Only the CLIP text encoder will be fine-tuned')
-        for param in clip_model.visual.parameters():
+        print('Only the BLIP text encoder will be fine-tuned')
+        for param in blip_model.visual_encoder.parameters():
             param.requires_grad = False
     elif encoder == 'image':
-        print('Only the CLIP image encoder will be fine-tuned')
-        for param in clip_model.parameters():
+        print('Only the BLIP image encoder will be fine-tuned')
+        for param in blip_model.parameters():
             param.requires_grad = False
-        for param in clip_model.visual.parameters():
+        for param in blip_model.visual.parameters():
             param.requires_grad = True
     elif encoder == 'both':
-        print('Both CLIP encoders will be fine-tuned')
+        print('Both BLIP encoders will be fine-tuned')
     else:
         raise ValueError("encoder parameter should be in ['text', 'image', both']")
 
-    clip_model.eval().float()
-    input_dim = clip_model.visual.input_resolution
+    blip_model.eval().float()
 
-    if transform == "clip":
-        preprocess = clip_preprocess
-        print('CLIP default preprocess pipeline is used')
-    elif transform == "squarepad":
-        preprocess = squarepad_transform(input_dim)
-        print('Square pad preprocess pipeline is used')
-    elif transform == "targetpad":
-        target_ratio = kwargs['target_ratio']
-        preprocess = targetpad_transform(target_ratio, input_dim)
-        print(f'Target pad with {target_ratio = } preprocess pipeline is used')
-    else:
-        raise ValueError("Preprocess transform should be in ['clip', 'squarepad', 'targetpad']")
+    # clip_model.eval().float()
+    # input_dim = clip_model.visual.input_resolution
+
+    # if transform == "clip":
+    #     preprocess = clip_preprocess
+    #     print('CLIP default preprocess pipeline is used')
+    # elif transform == "squarepad":
+    #     preprocess = squarepad_transform(input_dim)
+    #     print('Square pad preprocess pipeline is used')
+    # elif transform == "targetpad":
+    #     target_ratio = kwargs['target_ratio']
+    #     preprocess = targetpad_transform(target_ratio, input_dim)
+    #     print(f'Target pad with {target_ratio = } preprocess pipeline is used')
+    # else:
+    #     raise ValueError("Preprocess transform should be in ['clip', 'squarepad', 'targetpad']")
 
     # Define the validation datasets
-    relative_val_dataset = CIRRDataset('val', 'relative', preprocess)
-    classic_val_dataset = CIRRDataset('val', 'classic', preprocess)
+    relative_val_dataset = CIRRDatasetBLIP('val', 'relative', vis_processors, txt_processors)
+    classic_val_dataset = CIRRDatasetBLIP('val', 'classic', vis_processors, txt_processors)
 
     # When fine-tuning only the text encoder we can precompute the index features since they do not change over
     # the epochs
     if encoder == 'text':
-        val_index_features, val_index_names = extract_index_features(classic_val_dataset, clip_model)
+        val_index_features, val_index_names = extract_index_features(classic_val_dataset, blip_model)
 
     # Define the train dataset and the combining function
-    relative_train_dataset = CIRRDataset('train', 'relative', preprocess)
+    relative_train_dataset = CIRRDatasetBLIP('train', 'relative', vis_processors, txt_processors)
     relative_train_loader = DataLoader(dataset=relative_train_dataset, batch_size=batch_size,
                                        num_workers=multiprocessing.cpu_count(), pin_memory=False, collate_fn=collate_fn,
                                        drop_last=True, shuffle=True)
@@ -306,7 +314,7 @@ def clip_finetune_cirr(num_epochs: int, clip_model_name: str, learning_rate: flo
 
     # Define the optimizer, the loss and the grad scaler
     optimizer = optim.AdamW(
-        [{'params': filter(lambda p: p.requires_grad, clip_model.parameters()), 'lr': learning_rate,
+        [{'params': filter(lambda p: p.requires_grad, blip_model.parameters()), 'lr': learning_rate,
           'betas': (0.9, 0.999), 'eps': 1e-7}])
     crossentropy_criterion = nn.CrossEntropyLoss()
     scaler = torch.cuda.amp.GradScaler()
@@ -334,16 +342,21 @@ def clip_finetune_cirr(num_epochs: int, clip_model_name: str, learning_rate: flo
                 reference_images = reference_images.to(device, non_blocking=True)
                 target_images = target_images.to(device, non_blocking=True)
 
+                image_temp=[]
+                text_temp=[]
                 # Extract the features, compute the logits and the loss
                 with torch.cuda.amp.autocast():
-                    reference_features = clip_model.encode_image(reference_images)
-                    text_inputs = clip.tokenize(captions, context_length=77, truncate=True).to(device,
-                                                                                               non_blocking=True)
-                    text_features = clip_model.encode_text(text_inputs)
+                    reference_sample = {"image": reference_images, "text_input":text_temp}
+                    reference_features = blip_model.extract_features(reference_sample).image_embeds_proj
 
-                    target_features = F.normalize(clip_model.encode_image(target_images), dim=-1)
+                    text_sample = {"image": image_temp, "text_input": captions}
+                    text_features = blip_model.encode_extract_features(text_sample).text_embeds_proj
+
+                    target_sample = {"image": target_images, "text_input":text_temp}
+                    target_features = F.normalize(blip_model.extract_features(target_sample).image_embeds_proj, dim=-1)
+
+
                     predicted_features = combining_function(reference_features, text_features)
-
                     logits = 100 * predicted_features @ target_features.T
 
                     ground_truth = torch.arange(images_in_batch, dtype=torch.long, device=device)
@@ -371,8 +384,8 @@ def clip_finetune_cirr(num_epochs: int, clip_model_name: str, learning_rate: flo
         if epoch % validation_frequency == 0:
             with experiment.validate():
                 if encoder != 'text':
-                    val_index_features, val_index_names = extract_index_features(classic_val_dataset, clip_model)
-                results = compute_cirr_val_metrics(relative_val_dataset, clip_model, val_index_features,
+                    val_index_features, val_index_names = extract_index_features(classic_val_dataset, blip_model)
+                results = compute_cirr_val_metrics(relative_val_dataset, blip_model, val_index_features,
                                                    val_index_names, combining_function)
                 group_recall_at1, group_recall_at2, group_recall_at3, recall_at1, recall_at5, recall_at10, recall_at50 = results
 

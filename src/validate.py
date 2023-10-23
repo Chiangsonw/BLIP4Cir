@@ -13,7 +13,7 @@ from clip.model import CLIP
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from data_utils import squarepad_transform, FashionIQDataset, targetpad_transform, CIRRDataset
+from data_utils import squarepad_transform, FashionIQDataset, targetpad_transform, CIRRDataset, CIRRDatasetBLIP
 from combiner import Combiner
 from utils import extract_index_features, collate_fn, element_wise_sum, device
 
@@ -132,7 +132,7 @@ def fashioniq_val_retrieval(dress_type: str, combining_function: callable, clip_
                                    combining_function)
 
 
-def compute_cirr_val_metrics(relative_val_dataset: CIRRDataset, clip_model: CLIP, index_features: torch.tensor,
+def compute_cirr_val_metrics(relative_val_dataset: CIRRDataset, blip_model, index_features: torch.tensor,
                              index_names: List[str], combining_function: callable) -> Tuple[
     float, float, float, float, float, float, float]:
     """
@@ -147,7 +147,7 @@ def compute_cirr_val_metrics(relative_val_dataset: CIRRDataset, clip_model: CLIP
     """
     # Generate predictions
     predicted_features, reference_names, target_names, group_members = \
-        generate_cirr_val_predictions(clip_model, relative_val_dataset, combining_function, index_names, index_features)
+        generate_cirr_val_predictions(blip_model, relative_val_dataset, combining_function, index_names, index_features)
 
     print("Compute CIRR validation metrics")
 
@@ -188,7 +188,7 @@ def compute_cirr_val_metrics(relative_val_dataset: CIRRDataset, clip_model: CLIP
     return group_recall_at1, group_recall_at2, group_recall_at3, recall_at1, recall_at5, recall_at10, recall_at50
 
 
-def generate_cirr_val_predictions(clip_model: CLIP, relative_val_dataset: CIRRDataset,
+def generate_cirr_val_predictions(blip_model, relative_val_dataset: CIRRDataset,
                                   combining_function: callable, index_names: List[str], index_features: torch.tensor) -> \
         Tuple[torch.tensor, List[str], List[str], List[List[str]]]:
     """
@@ -209,19 +209,20 @@ def generate_cirr_val_predictions(clip_model: CLIP, relative_val_dataset: CIRRDa
     name_to_feat = dict(zip(index_names, index_features))
 
     # Initialize predicted features, target_names, group_members and reference_names
-    predicted_features = torch.empty((0, clip_model.visual.output_dim)).to(device, non_blocking=True)
+    predicted_features = torch.empty((0, 256)).to(device, non_blocking=True)
     target_names = []
     group_members = []
     reference_names = []
 
     for batch_reference_names, batch_target_names, captions, batch_group_members in tqdm(
             relative_val_loader):  # Load data
-        text_inputs = clip.tokenize(captions).to(device, non_blocking=True)
+        captions = captions.to(device)
         batch_group_members = np.array(batch_group_members).T.tolist()
+        text_sample = {"image":[],"text_input":captions}
 
         # Compute the predicted features
         with torch.no_grad():
-            text_features = clip_model.encode_text(text_inputs)
+            text_features = blip_model.extract_features(text_sample).text_embeds_proj
             # Check whether a single element is in the batch due to the exception raised by torch.stack when used with
             # a single tensor
             if text_features.shape[0] == 1:
@@ -239,7 +240,7 @@ def generate_cirr_val_predictions(clip_model: CLIP, relative_val_dataset: CIRRDa
     return predicted_features, reference_names, target_names, group_members
 
 
-def cirr_val_retrieval(combining_function: callable, clip_model: CLIP, preprocess: callable):
+def cirr_val_retrieval(combining_function: callable, blip_model, vision_preprocess, text_preprocess):
     """
     Perform retrieval on CIRR validation set computing the metrics. To combine the features the `combining_function`
     is used
@@ -249,14 +250,14 @@ def cirr_val_retrieval(combining_function: callable, clip_model: CLIP, preproces
     :param preprocess: preprocess pipeline
     """
 
-    clip_model = clip_model.float().eval()
+    blip_model = blip_model.float().eval()
 
     # Define the validation datasets and extract the index features
-    classic_val_dataset = CIRRDataset('val', 'classic', preprocess)
-    index_features, index_names = extract_index_features(classic_val_dataset, clip_model)
-    relative_val_dataset = CIRRDataset('val', 'relative', preprocess)
+    classic_val_dataset = CIRRDatasetBLIP('val', 'classic', vision_preprocess, text_preprocess)
+    index_features, index_names = extract_index_features(classic_val_dataset, blip_model)
+    relative_val_dataset = CIRRDatasetBLIP('val', 'relative', vision_preprocess, text_preprocess)
 
-    return compute_cirr_val_metrics(relative_val_dataset, clip_model, index_features, index_names,
+    return compute_cirr_val_metrics(relative_val_dataset, blip_model, index_features, index_names,
                                     combining_function)
 
 
