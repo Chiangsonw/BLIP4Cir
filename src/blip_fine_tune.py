@@ -284,6 +284,7 @@ def blip_finetune_cirr(num_epochs: int, learning_rate: float, batch_size: int,
 
     # When fine-tuning only the text encoder we can precompute the index features since they do not change over
     # the epochs
+    print("before extract_index_features___________________________")
     if encoder == 'text':
         val_index_features, val_index_names = extract_index_features(classic_val_dataset, blip_model)
 
