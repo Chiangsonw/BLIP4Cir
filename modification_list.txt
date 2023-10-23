@@ -8,3 +8,4 @@
 7 debug self.vision_preprocess["eval"] vision_preprocess是dict类型通过key eval找到对应的preprocess
 8 debug extract_features.embeds_proj shape = [bs,length,dim] 取cls [:0:] 为一维特征
 9 debug extract_features 需要指定 mode=image或者text 
+10 debug x.shape not correct too many values to unpack

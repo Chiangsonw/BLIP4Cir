@@ -132,7 +132,7 @@ def fashioniq_val_retrieval(dress_type: str, combining_function: callable, clip_
                                    combining_function)
 
 
-def compute_cirr_val_metrics(relative_val_dataset: CIRRDataset, blip_model, index_features: torch.tensor,
+def compute_cirr_val_metrics(relative_val_dataset: CIRRDatasetBLIP, blip_model, index_features: torch.tensor,
                              index_names: List[str], combining_function: callable) -> Tuple[
     float, float, float, float, float, float, float]:
     """
@@ -188,7 +188,7 @@ def compute_cirr_val_metrics(relative_val_dataset: CIRRDataset, blip_model, inde
     return group_recall_at1, group_recall_at2, group_recall_at3, recall_at1, recall_at5, recall_at10, recall_at50
 
 
-def generate_cirr_val_predictions(blip_model, relative_val_dataset: CIRRDataset,
+def generate_cirr_val_predictions(blip_model, relative_val_dataset: CIRRDatasetBLIP,
                                   combining_function: callable, index_names: List[str], index_features: torch.tensor) -> \
         Tuple[torch.tensor, List[str], List[str], List[List[str]]]:
     """
