@@ -218,7 +218,7 @@ def generate_cirr_val_predictions(blip_model, relative_val_dataset: CIRRDatasetB
             relative_val_loader):  # Load data
         captions = captions.to(device)
         batch_group_members = np.array(batch_group_members).T.tolist()
-        text_sample = {"image":[],"text_input":captions}
+        text_sample = {"image":[],"text_input":[captions]}
 
         # Compute the predicted features
         with torch.no_grad():

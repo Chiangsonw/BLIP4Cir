@@ -10,3 +10,4 @@
 9 debug extract_features 需要指定 mode=image或者text 
 10 debug x.shape not correct too many values to unpack
 11 debug reference target 不需要unsqueeze(0) shape 为 bs channel width height
+12 debug text_input 需要将captions 转为[] 列表

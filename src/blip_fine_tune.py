@@ -326,7 +326,7 @@ def blip_finetune_cirr(num_epochs: int, learning_rate: float, batch_size: int,
                 target_images = target_images.to(device, non_blocking=True)
                 print("reference image shape",reference_images.shape)
                 print("target image shape",target_images.shape)
-                print("text shape",captions.shape)
+                
                 
                 image_temp=[]
                 text_temp=[]
@@ -335,7 +335,7 @@ def blip_finetune_cirr(num_epochs: int, learning_rate: float, batch_size: int,
                     reference_sample = {"image": reference_images, "text_input":text_temp}
                     reference_features = blip_model.extract_features(reference_sample, mode="image").image_embeds_proj[:0:]
 
-                    text_sample = {"image": image_temp, "text_input": captions}
+                    text_sample = {"image": image_temp, "text_input": [captions]}
                     text_features = blip_model.extract_features(text_sample, mode="text").text_embeds_proj[:0:]
 
                     target_sample = {"image": target_images, "text_input":text_temp}
