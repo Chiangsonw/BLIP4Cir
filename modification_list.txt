@@ -3,3 +3,4 @@
 
 3 typo
 4 type
+5 debug dict obj is not callable
