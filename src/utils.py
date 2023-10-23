@@ -41,7 +41,7 @@ def extract_index_features(dataset: Union[CIRRDatasetBLIP, FashionIQDataset], bl
         samples = {"image": images, "text_input":cap}
         print("dataset is ok____________________________________")
         with torch.no_grad():
-            batch_features = blip_modal.extract_features(samples, mode="image").image_embeds_proj
+            batch_features = blip_modal.extract_features(samples, mode="image").image_embeds_proj[:,0,:]
             index_features = torch.vstack((index_features, batch_features))
             index_names.extend(names)
     return index_features, index_names
