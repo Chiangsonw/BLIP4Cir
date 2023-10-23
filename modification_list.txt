@@ -5,3 +5,4 @@
 4 type
 5 debug dict obj is not callable
 6 debug 
+7 debug self.vision_preprocess["eval"] vision_preprocess是dict类型通过key eval找到对应的preprocess

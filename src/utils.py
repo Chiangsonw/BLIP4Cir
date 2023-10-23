@@ -18,7 +18,7 @@ else:
     device = torch.device("cpu")
 
 
-def extract_index_features(dataset: Union[CIRRDataset, FashionIQDataset], blip_modal) -> \
+def extract_index_features(dataset: Union[CIRRDatasetBLIP, FashionIQDataset], blip_modal) -> \
         Tuple[torch.tensor, List[str]]:
     """
     Extract FashionIQ or CIRR index features
