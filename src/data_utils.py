@@ -193,7 +193,7 @@ class FashionIQDataset(Dataset):
 
 
 
-class CIRRDataset(Dataset):
+class CIRRDatasetBLIP(Dataset):
     """
        CIRR dataset class which manage CIRR data
        The dataset can be used in 'relative' or 'classic' mode:
