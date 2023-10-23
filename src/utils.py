@@ -10,7 +10,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from data_utils import CIRRDataset, FashionIQDataset
+from data_utils import CIRRDataset, FashionIQDataset, CIRRDatasetBLIP
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -31,7 +31,7 @@ def extract_index_features(dataset: Union[CIRRDataset, FashionIQDataset], blip_m
                                     pin_memory=True, collate_fn=collate_fn)
     index_features = torch.empty((0, feature_dim)).to(device, non_blocking=True)
     index_names = []
-    if isinstance(dataset, CIRRDataset):
+    if isinstance(dataset, CIRRDatasetBLIP):
         print(f"extracting CIRR {dataset.split} index features")
     elif isinstance(dataset, FashionIQDataset):
         print(f"extracting fashionIQ {dataset.dress_types} - {dataset.split} index features")
@@ -39,6 +39,7 @@ def extract_index_features(dataset: Union[CIRRDataset, FashionIQDataset], blip_m
         images = images.to(device, non_blocking=True)
         cap = []
         samples = {"image": images, "text_input":cap}
+        print("dataset is ok____________________________________")
         with torch.no_grad():
             batch_features = blip_modal.extract_features(samples, mode="image").image_embeds_proj
             index_features = torch.vstack((index_features, batch_features))

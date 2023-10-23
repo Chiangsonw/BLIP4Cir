@@ -264,7 +264,7 @@ class CIRRDatasetBLIP(Dataset):
             elif self.mode == 'classic':
                 image_name = list(self.name_to_relpath.keys())[index]
                 image_path = base_path / 'cirr_dataset' / self.name_to_relpath[image_name]
-                im = PIL.Image.open(image_path)
+                im = PIL.Image.open(image_path).convert('RGB')
                 image = self.vision_preprocess(im)
                 return image_name, image
 
