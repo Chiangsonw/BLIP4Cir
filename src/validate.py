@@ -222,7 +222,7 @@ def generate_cirr_val_predictions(blip_model, relative_val_dataset: CIRRDataset,
 
         # Compute the predicted features
         with torch.no_grad():
-            text_features = blip_model.extract_features(text_sample).text_embeds_proj[:0:]
+            text_features = blip_model.extract_features(text_sample, mode="text").text_embeds_proj[:0:]
             # Check whether a single element is in the batch due to the exception raised by torch.stack when used with
             # a single tensor
             if text_features.shape[0] == 1:
