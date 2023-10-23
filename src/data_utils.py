@@ -8,7 +8,8 @@ import torchvision.transforms.functional as F
 from torch.utils.data import Dataset
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 
-base_path = Path(__file__).absolute().parents[1].absolute()
+#父目录的父目录的父目录 /home/lmj/xintong 
+base_path = Path(__file__).absolute().parents[2].absolute()
 
 
 def _convert_image_to_rgb(image):
@@ -192,7 +193,7 @@ class FashionIQDataset(Dataset):
 
 
 
-class CIRRDatasetBLIP(Dataset):
+class CIRRDataset(Dataset):
     """
        CIRR dataset class which manage CIRR data
        The dataset can be used in 'relative' or 'classic' mode:
