@@ -9,3 +9,4 @@
 8 debug extract_features.embeds_proj shape = [bs,length,dim] 取cls [:0:] 为一维特征
 9 debug extract_features 需要指定 mode=image或者text 
 10 debug x.shape not correct too many values to unpack
+11 debug reference target 不需要unsqueeze(0) shape 为 bs channel width height

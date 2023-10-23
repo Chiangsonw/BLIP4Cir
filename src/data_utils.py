@@ -245,10 +245,10 @@ class CIRRDatasetBLIP(Dataset):
 
                 if self.split == 'train':
                     reference_image_path = base_path / 'cirr_dataset' / self.name_to_relpath[reference_name]
-                    reference_image = self.vision_preprocess["eval"](PIL.Image.open(reference_image_path).convert('RGB')).unsqueeze(0)
+                    reference_image = self.vision_preprocess["eval"](PIL.Image.open(reference_image_path).convert('RGB'))
                     target_hard_name = self.triplets[index]['target_hard']
                     target_image_path = base_path / 'cirr_dataset' / self.name_to_relpath[target_hard_name]
-                    target_image = self.vision_preprocess["eval"](PIL.Image.open(target_image_path).convert('RGB')).unsqueeze(0)
+                    target_image = self.vision_preprocess["eval"](PIL.Image.open(target_image_path).convert('RGB'))
                     
 
                     return reference_image, target_image, rel_caption
