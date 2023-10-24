@@ -12,3 +12,4 @@
 11 debug reference target 不需要unsqueeze(0) shape 为 bs channel width height
 12 debug text_input 需要将captions 转为[] 列表
 13 debug image_max_pixels = none  CUDA_VISIABLE_DEVICES=0
+14 debug text 输入尺寸和type 

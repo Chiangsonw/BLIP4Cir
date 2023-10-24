@@ -327,6 +327,10 @@ def blip_finetune_cirr(num_epochs: int, learning_rate: float, batch_size: int,
                 print("reference image shape",reference_images.shape)
                 print("target image shape",target_images.shape)
                 
+                print(type(captions))
+                print(captions.size())
+                print(captions[0].size())
+                print(captions[0])
                 
                 image_temp=[]
                 text_temp=[]
