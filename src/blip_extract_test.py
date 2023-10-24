@@ -3,7 +3,7 @@ from PIL import Image
 
 from lavis.models import load_model_and_preprocess
 
-raw_image = Image.open("../docs/_static/merlion.png").convert("RGB")
+raw_image = Image.open("/home/lmj/xintong/cirr_datasets/dev/dev-764-0-img1.png").convert("RGB")
 caption = "a large fountain spewing water into the air"
 
 
