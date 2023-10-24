@@ -8,6 +8,8 @@ import torchvision.transforms.functional as F
 from torch.utils.data import Dataset
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 
+PIL.Image.MAX_IMAGE_PIXELS = None
+
 #父目录的父目录的父目录 /home/lmj/xintong 
 base_path = Path(__file__).absolute().parents[2].absolute()
 
