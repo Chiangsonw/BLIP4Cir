@@ -13,3 +13,4 @@
 12 debug text_input 需要将captions 转为[] 列表
 13 debug image_max_pixels = none  CUDA_VISIABLE_DEVICES=0
 14 debug text 输入尺寸和type 
+15 debug rel caption 在dataset中直接返回 text pre process 在batch text上进行

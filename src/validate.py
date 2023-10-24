@@ -133,7 +133,7 @@ def fashioniq_val_retrieval(dress_type: str, combining_function: callable, clip_
 
 
 def compute_cirr_val_metrics(relative_val_dataset: CIRRDatasetBLIP, blip_model, index_features: torch.tensor,
-                             index_names: List[str], combining_function: callable) -> Tuple[
+                             index_names: List[str], combining_function: callable, txt_processors) -> Tuple[
     float, float, float, float, float, float, float]:
     """
     Compute validation metrics on CIRR dataset
@@ -147,7 +147,7 @@ def compute_cirr_val_metrics(relative_val_dataset: CIRRDatasetBLIP, blip_model, 
     """
     # Generate predictions
     predicted_features, reference_names, target_names, group_members = \
-        generate_cirr_val_predictions(blip_model, relative_val_dataset, combining_function, index_names, index_features)
+        generate_cirr_val_predictions(blip_model, relative_val_dataset, combining_function, index_names, index_features, txt_processors)
 
     print("Compute CIRR validation metrics")
 
@@ -189,7 +189,7 @@ def compute_cirr_val_metrics(relative_val_dataset: CIRRDatasetBLIP, blip_model, 
 
 
 def generate_cirr_val_predictions(blip_model, relative_val_dataset: CIRRDatasetBLIP,
-                                  combining_function: callable, index_names: List[str], index_features: torch.tensor) -> \
+                                  combining_function: callable, index_names: List[str], index_features: torch.tensor, txt_processors) -> \
         Tuple[torch.tensor, List[str], List[str], List[List[str]]]:
     """
     Compute CIRR predictions on the validation set
@@ -217,6 +217,7 @@ def generate_cirr_val_predictions(blip_model, relative_val_dataset: CIRRDatasetB
     for batch_reference_names, batch_target_names, captions, batch_group_members in tqdm(
             relative_val_loader):  # Load data
         captions = captions.to(device)
+        captions = txt_processors["eval"](captions)
         batch_group_members = np.array(batch_group_members).T.tolist()
         text_sample = {"image":[],"text_input":[captions]}
 

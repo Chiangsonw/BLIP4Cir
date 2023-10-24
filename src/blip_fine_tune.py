@@ -284,7 +284,7 @@ def blip_finetune_cirr(num_epochs: int, learning_rate: float, batch_size: int,
 
     # When fine-tuning only the text encoder we can precompute the index features since they do not change over
     # the epochs
-    print("before extract_index_features___________________________")
+
     if encoder == 'text':
         val_index_features, val_index_names = extract_index_features(classic_val_dataset, blip_model)
 
@@ -328,10 +328,9 @@ def blip_finetune_cirr(num_epochs: int, learning_rate: float, batch_size: int,
                 print("target image shape",target_images.shape)
                 
                 print(type(captions))
-                print(captions.size())
-                print(captions[0].size())
-                print(captions[0])
-                
+                captions = txt_processors["eval"](captions)
+                print(type(captions))
+
                 image_temp=[]
                 text_temp=[]
                 # Extract the features, compute the logits and the loss
@@ -376,7 +375,7 @@ def blip_finetune_cirr(num_epochs: int, learning_rate: float, batch_size: int,
                 if encoder != 'text':
                     val_index_features, val_index_names = extract_index_features(classic_val_dataset, blip_model)
                 results = compute_cirr_val_metrics(relative_val_dataset, blip_model, val_index_features,
-                                                   val_index_names, combining_function)
+                                                   val_index_names, combining_function, txt_processors)
                 group_recall_at1, group_recall_at2, group_recall_at3, recall_at1, recall_at5, recall_at10, recall_at50 = results
 
                 results_dict = {

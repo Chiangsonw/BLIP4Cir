@@ -243,7 +243,6 @@ class CIRRDatasetBLIP(Dataset):
                 group_members = self.triplets[index]['img_set']['members']
                 reference_name = self.triplets[index]['reference']
                 rel_caption = self.triplets[index]['caption']
-                rel_caption = self.text_preprocess["eval"](rel_caption)
 
                 if self.split == 'train':
                     reference_image_path = base_path / 'cirr_dataset' / self.name_to_relpath[reference_name]
