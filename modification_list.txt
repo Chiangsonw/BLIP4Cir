@@ -15,3 +15,4 @@
 14 debug text 输入尺寸和type 
 15 debug rel caption 在dataset中直接返回 text pre process 在batch text上进行
 16 debug rel caption 是tuple 强转为list后 作为processor的输入
+17 debug list test

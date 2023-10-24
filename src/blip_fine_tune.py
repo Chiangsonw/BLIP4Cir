@@ -330,6 +330,8 @@ def blip_finetune_cirr(num_epochs: int, learning_rate: float, batch_size: int,
                 print(type(captions))
                 captions = list(captions)
                 print(type(captions))
+                print(len(captions))
+                print(captions[0])
                 captions = txt_processors["eval"](captions)
                 print(type(captions))
 
