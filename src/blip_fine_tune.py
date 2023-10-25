@@ -350,7 +350,7 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
                 with torch.cuda.amp.autocast():
                     reference_features = blip_model.extract_features({"image":reference_images}, mode="image").image_embeds_proj[:,0,:]
                     target_features = F.normalize(blip_model.extract_features({"image":target_images}, mode="image").image_embeds_proj[:,0,:], dim=-1)
-                    text_features = blip_model.extract_features({"text":text_inputs}, mode="text").text_embeds_proj[:,0,:]
+                    text_features = blip_model.extract_features({"text_input":text_inputs}, mode="text").text_embeds_proj[:,0,:]
 
                     predicted_features = combining_function(reference_features, text_features)
 
