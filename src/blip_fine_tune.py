@@ -18,7 +18,7 @@ from data_utils import base_path, squarepad_transform, targetpad_transform, CIRR
 
 from utils import collate_fn, update_train_running_results, set_train_bar_description, save_model, \
     extract_index_features,extract_index_features_blip, generate_randomized_fiq_caption, device, generate_randomized_fiq_caption_blip, element_wise_sum
-from validate import compute_cirr_val_metrics, compute_fiq_val_metrics,compute_fiq_val_metrics_blip
+from validate_blip import compute_cirr_val_metrics, compute_fiq_val_metrics,compute_fiq_val_metrics_blip
 from lavis.models import load_model_and_preprocess
 
 base_path = Path('/home/lmj/xintong/BLIP4Cir')
