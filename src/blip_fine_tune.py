@@ -264,7 +264,7 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
         json.dump(training_hyper_params, file, sort_keys=True, indent=4)
 
     # blip_model, blip_preprocess = blip.load(blip_model_name, device=device, jit=False)
-    blip_model, vis_processors, txt_processors = load_model_and_preprocess(name=blip_model_name, model_type="pretrain", is_eval=False, device=device)
+    blip_model, vis_processors, txt_processors = load_model_and_preprocess(name="blip2_feature_extractor", model_type="pretrain", is_eval=False, device=device)
 
 
     # if encoder == 'text':
