@@ -339,14 +339,13 @@ def blip_finetune_cirr(num_epochs: int, learning_rate: float, batch_size: int,
 
                     target_sample = {"image": target_images, "text_input":text_temp}
                     target_features = F.normalize(blip_model.extract_features(target_sample, mode="image").image_embeds_proj[:,0,:], dim=-1)
+                    predicted_features = F.normalize(combining_function(reference_features, text_features), dim=-1)
 
-
-                    predicted_features = combining_function(reference_features, text_features)
                     logits = 100 * predicted_features @ target_features.T
+                    ground_truth = torch.arange(images_in_batch, dtype=torch.long, device=device)    
+                    loss = crossentropy_criterion(logits, ground_truth)
+                    loss.requires_grad = True
 
-                ground_truth = torch.arange(images_in_batch, dtype=torch.long, device=device)    
-                loss = crossentropy_criterion(logits, ground_truth)
-                loss.requires_grad = True
                 # Backpropagate and update the weights
                 scaler.scale(loss).backward()
                 scaler.step(optimizer)

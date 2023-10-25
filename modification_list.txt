@@ -21,3 +21,4 @@
 20 debug 需要更新的参数只有 blip_model.Qformer Qfromer中的bert和query tokens都要训练
 21 debug 修改loss.require_grad
 22 debug 修改loss计算位置 放在amp.autocast以外
+23 debug 修改predicted features  normalize 标准化
