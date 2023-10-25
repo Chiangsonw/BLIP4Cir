@@ -324,17 +324,16 @@ def blip_finetune_cirr(num_epochs: int, learning_rate: float, batch_size: int,
 
                 reference_images = reference_images.to(device, non_blocking=True)
                 target_images = target_images.to(device, non_blocking=True)
-                print("reference image shape",reference_images.shape)
-                print("target image shape",target_images.shape)
-                
-                print(type(captions))
                 captions = list(captions)
-                print(type(captions))
-                print(len(captions))
-                print(captions[0])
-                print(type(captions))
-                captions = txt_processors["train"](captions)
-                print(type(captions))
+                
+                # print(type(captions))
+                # captions = list(captions)
+                # print(type(captions))
+                # print(len(captions))
+                # print(captions[0])
+                # print(type(captions))
+                # captions = txt_processors["train"](captions)
+                # print(type(captions))
 
                 image_temp=[]
                 text_temp=[]

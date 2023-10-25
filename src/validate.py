@@ -216,10 +216,11 @@ def generate_cirr_val_predictions(blip_model, relative_val_dataset: CIRRDatasetB
 
     for batch_reference_names, batch_target_names, captions, batch_group_members in tqdm(
             relative_val_loader):  # Load data
+        
         captions = captions.to(device)
-        captions = txt_processors["eval"](captions)
+        captions = list(captions)
         batch_group_members = np.array(batch_group_members).T.tolist()
-        text_sample = {"image":[],"text_input":[captions]}
+        text_sample = {"image":[],"text_input":captions}
 
         # Compute the predicted features
         with torch.no_grad():
