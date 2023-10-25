@@ -8,6 +8,7 @@ import torchvision.transforms.functional as F
 from torch.utils.data import Dataset
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 
+PIL.Image.MAX_IMAGE_PIXELS=None
 # base_path = Path(__file__).absolute().parents[1].absolute()
 base_path = Path('/home/lmj/xintong')
 
@@ -211,7 +212,7 @@ class CIRRDataset(Dataset):
                 - (pair_id, reference_name, rel_caption, group_members) when split == test1
     """
 
-    def __init__(self, split: str, mode: str, preprocess: callable):
+    def __init__(self, split: str, mode: str, preprocess: callable, text_processor: callable):
         """
         :param split: dataset split, should be in ['test', 'train', 'val']
         :param mode: dataset mode, should be in ['relative', 'classic']:
@@ -223,6 +224,7 @@ class CIRRDataset(Dataset):
         :param preprocess: function which preprocesses the image
         """
         self.preprocess = preprocess
+        self.text_processor = text_processor
         self.mode = mode
         self.split = split
 
@@ -247,6 +249,7 @@ class CIRRDataset(Dataset):
                 group_members = self.triplets[index]['img_set']['members']
                 reference_name = self.triplets[index]['reference']
                 rel_caption = self.triplets[index]['caption']
+                rel_caption = self.text_processor(rel_caption)
 
                 if self.split == 'train':
                     reference_image_path = base_path / 'cirr_datasets' / self.name_to_relpath[reference_name]

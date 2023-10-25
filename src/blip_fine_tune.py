@@ -299,8 +299,8 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
     #     raise ValueError("Preprocess transform should be in ['blip', 'squarepad', 'targetpad']")
 
     # Define the validation datasets
-    relative_val_dataset = CIRRDataset('val', 'relative', vis_processors["eval"])
-    classic_val_dataset = CIRRDataset('val', 'classic', vis_processors["eval"])
+    relative_val_dataset = CIRRDataset('val', 'relative', vis_processors["eval"],txt_processors["eval"])
+    classic_val_dataset = CIRRDataset('val', 'classic', vis_processors["eval"],txt_processors["eval"])
 
     # When fine-tuning only the text encoder we can precompute the index features since they do not change over
     # the epochs
@@ -308,7 +308,7 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
         val_index_features, val_index_names = extract_index_features_blip(classic_val_dataset, blip_model)
 
     # Define the train dataset and the combining function
-    relative_train_dataset = CIRRDataset('train', 'relative', vis_processors["eval"])
+    relative_train_dataset = CIRRDataset('train', 'relative', vis_processors["eval"],txt_processors["eval"])
     relative_train_loader = DataLoader(dataset=relative_train_dataset, batch_size=batch_size,
                                        num_workers=multiprocessing.cpu_count(), pin_memory=False, collate_fn=collate_fn,
                                        drop_last=True, shuffle=True)
@@ -343,7 +343,7 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
 
                 reference_images = reference_images.to(device, non_blocking=True)
                 target_images = target_images.to(device, non_blocking=True)
-                text_inputs = txt_processors["eval"](captions)
+                text_inputs = list(captions)
 
                 # Extract the features, compute the logits and the loss
                 with torch.cuda.amp.autocast():
