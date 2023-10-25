@@ -281,7 +281,12 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
     #     print('Both blip encoders will be fine-tuned')
     # else:
     #     raise ValueError("encoder parameter should be in ['text', 'image', both']")
-
+    if encoder == 'text':
+        print('Only the blip text encoder will be fine-tuned')
+        for param in blip_model.vision_encoder.parameters():
+            param.requires_grad = False
+        for param in blip_model.Qformer.bert.parameters():
+            param.requires_grad = True
     blip_model.eval().float()
 
 
@@ -360,6 +365,7 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
                     loss = crossentropy_criterion(logits, ground_truth)
 
                 # Backpropagate and update the weights
+                loss.requires_grad_(True) 
                 scaler.scale(loss).backward()
                 scaler.step(optimizer)
                 scaler.update()

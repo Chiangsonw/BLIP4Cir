@@ -32,4 +32,5 @@
     blip_finetune_cirr x
 
 28 debug num_worker from multiprocessing.cpu.count to 0
+29 debug Qformer.bert require_grad   loss .require_grad 
     
