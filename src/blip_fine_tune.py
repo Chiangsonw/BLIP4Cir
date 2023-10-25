@@ -326,27 +326,18 @@ def blip_finetune_cirr(num_epochs: int, learning_rate: float, batch_size: int,
                 target_images = target_images.to(device, non_blocking=True)
                 captions = list(captions)
                 
-                # print(type(captions))
-                # captions = list(captions)
-                # print(type(captions))
-                # print(len(captions))
-                # print(captions[0])
-                # print(type(captions))
-                # captions = txt_processors["train"](captions)
-                # print(type(captions))
-
                 image_temp=[]
                 text_temp=[]
                 # Extract the features, compute the logits and the loss
                 with torch.cuda.amp.autocast():
                     reference_sample = {"image": reference_images, "text_input":text_temp}
-                    reference_features = blip_model.extract_features(reference_sample, mode="image").image_embeds_proj[:0:]
+                    reference_features = blip_model.extract_features(reference_sample, mode="image").image_embeds_proj[:,0,:]
 
                     text_sample = {"image": image_temp, "text_input": captions}
-                    text_features = blip_model.extract_features(text_sample, mode="text").text_embeds_proj[:0:]
+                    text_features = blip_model.extract_features(text_sample, mode="text").text_embeds_proj[:,0,:]
 
                     target_sample = {"image": target_images, "text_input":text_temp}
-                    target_features = F.normalize(blip_model.extract_features(target_sample, mode="image").image_embeds_proj[:0:], dim=-1)
+                    target_features = F.normalize(blip_model.extract_features(target_sample, mode="image").image_embeds_proj[:,0,:], dim=-1)
 
 
                     predicted_features = combining_function(reference_features, text_features)

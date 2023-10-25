@@ -17,3 +17,4 @@
 16 debug rel caption 是tuple 强转为list后 作为processor的输入
 17 debug list test
 18 debug 在dataset中preprocess 单个字符串，经过collate_FN 后为tuple 强制转型为List 作为samples 中的text_input
+19 debug take cls token for global features [bs, dim] dim = 256
