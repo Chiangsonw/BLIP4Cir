@@ -261,7 +261,7 @@ def blip_finetune_cirr(num_epochs: int, learning_rate: float, batch_size: int,
 
     blip_model, vis_processors, txt_processors = load_model_and_preprocess(name="blip2_feature_extractor", model_type="pretrain", is_eval=True, device=device)
 
-    blip_model.eval().float()
+
 
     if encoder == 'text':
         print('Only the BLIP text encoder will be fine-tuned')
@@ -275,6 +275,8 @@ def blip_finetune_cirr(num_epochs: int, learning_rate: float, batch_size: int,
         print('Both BLIP encoders will be fine-tuned')
     else:
         raise ValueError("encoder parameter should be in ['text', 'image', both']")
+
+    blip_model.eval().float()
 
 
     # Define the validation datasets
@@ -342,10 +344,9 @@ def blip_finetune_cirr(num_epochs: int, learning_rate: float, batch_size: int,
                     predicted_features = combining_function(reference_features, text_features)
                     logits = 100 * predicted_features @ target_features.T
 
-                    ground_truth = torch.arange(images_in_batch, dtype=torch.long, device=device)
-                    loss = crossentropy_criterion(logits, ground_truth)
-                    loss.requires_grad = True
-
+                ground_truth = torch.arange(images_in_batch, dtype=torch.long, device=device)    
+                loss = crossentropy_criterion(logits, ground_truth)
+                loss.requires_grad = True
                 # Backpropagate and update the weights
                 scaler.scale(loss).backward()
                 scaler.step(optimizer)
