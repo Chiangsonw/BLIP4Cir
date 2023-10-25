@@ -261,22 +261,21 @@ def blip_finetune_cirr(num_epochs: int, learning_rate: float, batch_size: int,
 
     blip_model, vis_processors, txt_processors = load_model_and_preprocess(name="blip2_feature_extractor", model_type="pretrain", is_eval=True, device=device)
 
+    blip_model.eval().float()
+
     if encoder == 'text':
         print('Only the BLIP text encoder will be fine-tuned')
-        for param in blip_model.visual_encoder.parameters():
-            param.requires_grad = False
+        for param in blip_model.Qformer.parameters():
+            param.requires_grad = True
     elif encoder == 'image':
         print('Only the BLIP image encoder will be fine-tuned')
-        for param in blip_model.parameters():
-            param.requires_grad = False
-        for param in blip_model.visual.parameters():
+        for param in blip_model.Qformer.parameters():
             param.requires_grad = True
     elif encoder == 'both':
         print('Both BLIP encoders will be fine-tuned')
     else:
         raise ValueError("encoder parameter should be in ['text', 'image', both']")
 
-    blip_model.eval().float()
 
     # Define the validation datasets
     relative_val_dataset = CIRRDatasetBLIP('val', 'relative', vis_processors, txt_processors)
