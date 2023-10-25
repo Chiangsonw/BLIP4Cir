@@ -344,10 +344,16 @@ def blip_finetune_cirr(num_epochs: int, learning_rate: float, batch_size: int,
                     logits = 100 * predicted_features @ target_features.T
                     ground_truth = torch.arange(images_in_batch, dtype=torch.float, device=device)    
                     loss = crossentropy_criterion(logits, ground_truth)
+                    print("reference has nan", torch.isnan(reference_features).any()) # 有一个True（非NAN）则都为 True)
+                    print("target has nan", torch.isnan(target_features).any()) # 有一个True（非NAN）则都为 True)
+                    print("text has nan", torch.isnan(text_features).any()) # 有一个True（非NAN）则都为 True)
+
+                    print("loss has nan", torch.isnan(loss).any()) # 有一个True（非NAN）则都为 True)
                     loss.requires_grad = True
                     torch.nan_to_num(loss)
+                    print("loss has nan", torch.isnan(loss).any()) # 有一个True（非NAN）则都为 True)
 
-                loss.float()
+                # loss.float()
 
                 # Backpropagate and update the weights
                 scaler.scale(loss).backward()
