@@ -112,7 +112,7 @@ def blip_finetune_fiq(train_dress_types: List[str], val_dress_types: List[str],
     # Define the train datasets and the combining function
     relative_train_dataset = FashionIQDataset('train', train_dress_types, 'relative', vis_processors["eval"])
     relative_train_loader = DataLoader(dataset=relative_train_dataset, batch_size=batch_size,
-                                       num_workers=multiprocessing.cpu_count(), pin_memory=False, collate_fn=collate_fn,
+                                       num_workers=0, pin_memory=False, collate_fn=collate_fn,
                                        drop_last=True, shuffle=True)
     combining_function = element_wise_sum
 
@@ -310,7 +310,7 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
     # Define the train dataset and the combining function
     relative_train_dataset = CIRRDataset('train', 'relative', vis_processors["eval"],txt_processors["eval"])
     relative_train_loader = DataLoader(dataset=relative_train_dataset, batch_size=batch_size,
-                                       num_workers=multiprocessing.cpu_count(), pin_memory=False, collate_fn=collate_fn,
+                                       num_workers=0, pin_memory=False, collate_fn=collate_fn,
                                        drop_last=True, shuffle=True)
     combining_function = element_wise_sum
 

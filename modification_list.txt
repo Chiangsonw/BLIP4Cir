@@ -30,4 +30,6 @@
     dataset x
     utils x
     blip_finetune_cirr x
+
+28 debug num_worker from multiprocessing.cpu.count to 0
     
