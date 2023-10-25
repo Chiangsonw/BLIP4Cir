@@ -19,3 +19,4 @@
 18 debug 在dataset中preprocess 单个字符串，经过collate_FN 后为tuple 强制转型为List 作为samples 中的text_input
 19 debug take cls token for global features [bs, dim] dim = 256
 20 debug 需要更新的参数只有 blip_model.Qformer Qfromer中的bert和query tokens都要训练
+21 debug 修改loss.require_grad
