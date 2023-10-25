@@ -8,10 +8,8 @@ import torchvision.transforms.functional as F
 from torch.utils.data import Dataset
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 
-PIL.Image.MAX_IMAGE_PIXELS = None
-
-#父目录的父目录的父目录 /home/lmj/xintong 
-base_path = Path(__file__).absolute().parents[2].absolute()
+# base_path = Path(__file__).absolute().parents[1].absolute()
+base_path = Path('/data/zhouyinan/data_all')
 
 
 def _convert_image_to_rgb(image):
@@ -137,47 +135,55 @@ class FashionIQDataset(Dataset):
 
         self.preprocess = preprocess
 
+
         # get triplets made by (reference_image, target_image, a pair of relative captions)
         self.triplets: List[dict] = []
         for dress_type in dress_types:
-            with open(base_path / 'fashionIQ_dataset' / 'captions' / f'cap.{dress_type}.{split}.json') as f:
+            with open(base_path / 'fashionIQ' / 'captions' / f'cap.{dress_type}.{split}.json') as f:
                 self.triplets.extend(json.load(f))
 
         # get the image names
         self.image_names: list = []
         for dress_type in dress_types:
-            with open(base_path / 'fashionIQ_dataset' / 'image_splits' / f'split.{dress_type}.{split}.json') as f:
+            with open(base_path / 'fashionIQ' / 'image_splits' / f'split.{dress_type}.{split}.json') as f:
                 self.image_names.extend(json.load(f))
 
         print(f"FashionIQ {split} - {dress_types} dataset in {mode} mode initialized")
+        for image_name in self.image_names[:]:
+            file_path = base_path / 'fashionIQ' / 'image_data' / f"{image_name}.jpg"
+            
+            # 使用 Path.exists() 方法检查文件是否存在
+            if not file_path.exists():
+                # 如果文件不存在，从列表中删除该项
+                self.image_names.remove(image_name)
 
     def __getitem__(self, index):
         try:
             if self.mode == 'relative':
                 image_captions = self.triplets[index]['captions']
-                reference_name = self.triplets[index]['candidate']
+                reference_name = self.triplets[index]['candidate'].replace(".jpg", "")
 
                 if self.split == 'train':
-                    reference_image_path = base_path / 'fashionIQ_dataset' / 'images' / f"{reference_name}.jpg"
-                    reference_image = self.preprocess(PIL.Image.open(reference_image_path))
-                    target_name = self.triplets[index]['target']
-                    target_image_path = base_path / 'fashionIQ_dataset' / 'images' / f"{target_name}.jpg"
-                    target_image = self.preprocess(PIL.Image.open(target_image_path))
+                    reference_image_path = base_path / 'fashionIQ' / 'image_data' / f"{reference_name}.jpg"
+                    reference_image = self.preprocess(PIL.Image.open(reference_image_path).convert("RGB"))
+                    target_name = self.triplets[index]['target'].replace(".jpg", "")
+                    target_image_path = base_path / 'fashionIQ' / 'image_data' / f"{target_name}.jpg"
+                    target_image = self.preprocess(PIL.Image.open(target_image_path).convert("RGB"))
                     return reference_image, target_image, image_captions
 
                 elif self.split == 'val':
-                    target_name = self.triplets[index]['target']
+                    target_name = self.triplets[index]['target'].replace(".jpg", "")
                     return reference_name, target_name, image_captions
-
+                
                 elif self.split == 'test':
-                    reference_image_path = base_path / 'fashionIQ_dataset' / 'images' / f"{reference_name}.jpg"
-                    reference_image = self.preprocess(PIL.Image.open(reference_image_path))
+                    reference_image_path = base_path / 'fashionIQ' / 'image_data' / f"{reference_name}.jpg"
+                    reference_image = self.preprocess(PIL.Image.open(reference_image_path).convert("RGB"))
                     return reference_name, reference_image, image_captions
 
             elif self.mode == 'classic':
                 image_name = self.image_names[index]
-                image_path = base_path / 'fashionIQ_dataset' / 'images' / f"{image_name}.jpg"
-                image = self.preprocess(PIL.Image.open(image_path))
+                image_path = base_path / 'fashionIQ' / 'image_data' / f"{image_name}.jpg"
+                image = self.preprocess(PIL.Image.open(image_path).convert("RGB"))
                 return image_name, image
 
             else:
@@ -192,98 +198,6 @@ class FashionIQDataset(Dataset):
             return len(self.image_names)
         else:
             raise ValueError("mode should be in ['relative', 'classic']")
-
-
-
-class CIRRDatasetBLIP(Dataset):
-    """
-       CIRR dataset class which manage CIRR data
-       The dataset can be used in 'relative' or 'classic' mode:
-           - In 'classic' mode the dataset yield tuples made of (image_name, image)
-           - In 'relative' mode the dataset yield tuples made of:
-                - (reference_image, target_image, rel_caption) when split == train
-                - (reference_name, target_name, rel_caption, group_members) when split == val
-                - (pair_id, reference_name, rel_caption, group_members) when split == test1
-    """
-
-    def __init__(self, split: str, mode: str, vision_preprocess, text_preprocess):
-        """
-        :param split: dataset split, should be in ['test', 'train', 'val']
-        :param mode: dataset mode, should be in ['relative', 'classic']:
-                  - In 'classic' mode the dataset yield tuples made of (image_name, image)
-                  - In 'relative' mode the dataset yield tuples made of:
-                        - (reference_image, target_image, rel_caption) when split == train
-                        - (reference_name, target_name, rel_caption, group_members) when split == val
-                        - (pair_id, reference_name, rel_caption, group_members) when split == test1
-        :param preprocess: function which preprocesses the image
-        """
-        self.vision_preprocess = vision_preprocess
-        self.text_preprocess = text_preprocess
-        self.mode = mode
-        self.split = split
-
-        if split not in ['test1', 'train', 'val']:
-            raise ValueError("split should be in ['test1', 'train', 'val']")
-        if mode not in ['relative', 'classic']:
-            raise ValueError("mode should be in ['relative', 'classic']")
-
-        # get triplets made by (reference_image, target_image, relative caption)
-        with open(base_path / 'cirr_dataset' / 'cirr' / 'captions' / f'cap.rc2.{split}.json') as f:
-            self.triplets = json.load(f)
-
-        # get a mapping from image name to relative path
-        with open(base_path / 'cirr_dataset' / 'cirr' / 'image_splits' / f'split.rc2.{split}.json') as f:
-            self.name_to_relpath = json.load(f)
-
-        print(f"CIRR {split} dataset in {mode} mode initialized")
-
-    def __getitem__(self, index):
-        try:
-            if self.mode == 'relative':
-                group_members = self.triplets[index]['img_set']['members']
-                reference_name = self.triplets[index]['reference']
-                rel_caption = self.triplets[index]['caption']
-                rel_caption = self.text_preprocess["eval"](rel_caption)
-
-
-                if self.split == 'train':
-                    reference_image_path = base_path / 'cirr_dataset' / self.name_to_relpath[reference_name]
-                    reference_image = self.vision_preprocess["eval"](PIL.Image.open(reference_image_path).convert('RGB'))
-                    target_hard_name = self.triplets[index]['target_hard']
-                    target_image_path = base_path / 'cirr_dataset' / self.name_to_relpath[target_hard_name]
-                    target_image = self.vision_preprocess["eval"](PIL.Image.open(target_image_path).convert('RGB'))
-
-                    return reference_image, target_image, rel_caption
-
-                elif self.split == 'val':
-                    target_hard_name = self.triplets[index]['target_hard']
-                    return reference_name, target_hard_name, rel_caption, group_members
-
-                elif self.split == 'test1':
-                    pair_id = self.triplets[index]['pairid']
-                    return pair_id, reference_name, rel_caption, group_members
-
-            elif self.mode == 'classic':
-                image_name = list(self.name_to_relpath.keys())[index]
-                image_path = base_path / 'cirr_dataset' / self.name_to_relpath[image_name]
-                im = PIL.Image.open(image_path).convert('RGB')
-                image = self.vision_preprocess["eval"](im)
-                return image_name, image
-
-            else:
-                raise ValueError("mode should be in ['relative', 'classic']")
-
-        except Exception as e:
-            print(f"Exception: {e}")
-
-    def __len__(self):
-        if self.mode == 'relative':
-            return len(self.triplets)
-        elif self.mode == 'classic':
-            return len(self.name_to_relpath)
-        else:
-            raise ValueError("mode should be in ['relative', 'classic']")
-
 
 
 class CIRRDataset(Dataset):
@@ -318,11 +232,11 @@ class CIRRDataset(Dataset):
             raise ValueError("mode should be in ['relative', 'classic']")
 
         # get triplets made by (reference_image, target_image, relative caption)
-        with open(base_path / 'cirr_dataset' / 'cirr' / 'captions' / f'cap.rc2.{split}.json') as f:
+        with open(base_path  / 'cirr' / 'captions' / f'cap.rc2.{split}.json') as f:
             self.triplets = json.load(f)
 
         # get a mapping from image name to relative path
-        with open(base_path / 'cirr_dataset' / 'cirr' / 'image_splits' / f'split.rc2.{split}.json') as f:
+        with open(base_path / 'cirr' / 'image_splits' / f'split.rc2.{split}.json') as f:
             self.name_to_relpath = json.load(f)
 
         print(f"CIRR {split} dataset in {mode} mode initialized")
@@ -335,11 +249,11 @@ class CIRRDataset(Dataset):
                 rel_caption = self.triplets[index]['caption']
 
                 if self.split == 'train':
-                    reference_image_path = base_path / 'cirr_dataset' / self.name_to_relpath[reference_name]
-                    reference_image = self.preprocess(PIL.Image.open(reference_image_path))
+                    reference_image_path = base_path / 'cirr' / self.name_to_relpath[reference_name]
+                    reference_image = self.preprocess(PIL.Image.open(reference_image_path).convert("RGB"))
                     target_hard_name = self.triplets[index]['target_hard']
-                    target_image_path = base_path / 'cirr_dataset' / self.name_to_relpath[target_hard_name]
-                    target_image = self.preprocess(PIL.Image.open(target_image_path))
+                    target_image_path = base_path / 'cirr' / self.name_to_relpath[target_hard_name]
+                    target_image = self.preprocess(PIL.Image.open(target_image_path).convert("RGB"))
                     return reference_image, target_image, rel_caption
 
                 elif self.split == 'val':
@@ -352,8 +266,8 @@ class CIRRDataset(Dataset):
 
             elif self.mode == 'classic':
                 image_name = list(self.name_to_relpath.keys())[index]
-                image_path = base_path / 'cirr_dataset' / self.name_to_relpath[image_name]
-                im = PIL.Image.open(image_path)
+                image_path = base_path / 'cirr' / self.name_to_relpath[image_name]
+                im = PIL.Image.open(image_path).convert("RGB")
                 image = self.preprocess(im)
                 return image_name, image
 

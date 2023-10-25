@@ -9,16 +9,44 @@ from clip.model import CLIP
 from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-
-from data_utils import CIRRDataset, FashionIQDataset, CIRRDatasetBLIP
+from data_utils import CIRRDataset, FashionIQDataset
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
+
+
 else:
     device = torch.device("cpu")
 
+def extract_index_features_blip(dataset: Union[CIRRDataset, FashionIQDataset], model: CLIP) -> \
+        Tuple[torch.tensor, List[str]]:
+    """
+    Extract FashionIQ or CIRR index features
+    :param dataset: FashionIQ or CIRR dataset in 'classic' mode
+    :param model: CLIP model
+    :return: a tensor of features and a list of images
+    """
+    # feature_dim = model.visual.output_dim
+    feature_dim = 768
 
-def extract_index_features(dataset: Union[CIRRDatasetBLIP, FashionIQDataset], blip_modal) -> \
+    classic_val_loader = DataLoader(dataset=dataset, batch_size=32, num_workers=multiprocessing.cpu_count(),
+                                    pin_memory=True, collate_fn=collate_fn)
+    index_features = torch.empty((0,32, feature_dim)).to(device, non_blocking=True)
+    index_names = []
+    if isinstance(dataset, CIRRDataset):
+        print(f"extracting CIRR {dataset.split} index features")
+    elif isinstance(dataset, FashionIQDataset):
+        print(f"extracting fashionIQ {dataset.dress_types} - {dataset.split} index features")
+    for names, images in tqdm(classic_val_loader):
+        images = images.to(device, non_blocking=True)
+        with torch.no_grad():
+            batch_features = model.extract_features({"image":images}, mode="image").image_embeds
+            index_features = torch.vstack((index_features, batch_features))
+            index_names.extend(names)
+    return index_features, index_names
+
+
+def extract_index_features(dataset: Union[CIRRDataset, FashionIQDataset], clip_model: CLIP) -> \
         Tuple[torch.tensor, List[str]]:
     """
     Extract FashionIQ or CIRR index features
@@ -26,21 +54,19 @@ def extract_index_features(dataset: Union[CIRRDatasetBLIP, FashionIQDataset], bl
     :param clip_model: CLIP model
     :return: a tensor of features and a list of images
     """
-    feature_dim = 256
+    feature_dim = clip_model.visual.output_dim
     classic_val_loader = DataLoader(dataset=dataset, batch_size=32, num_workers=multiprocessing.cpu_count(),
                                     pin_memory=True, collate_fn=collate_fn)
     index_features = torch.empty((0, feature_dim)).to(device, non_blocking=True)
     index_names = []
-    if isinstance(dataset, CIRRDatasetBLIP):
+    if isinstance(dataset, CIRRDataset):
         print(f"extracting CIRR {dataset.split} index features")
     elif isinstance(dataset, FashionIQDataset):
         print(f"extracting fashionIQ {dataset.dress_types} - {dataset.split} index features")
     for names, images in tqdm(classic_val_loader):
         images = images.to(device, non_blocking=True)
-        cap = []
-        samples = {"image": images, "text_input":cap}
         with torch.no_grad():
-            batch_features = blip_modal.extract_features(samples, mode="image").image_embeds_proj[:,0,:]
+            batch_features = clip_model.encode_image(images)
             index_features = torch.vstack((index_features, batch_features))
             index_names.extend(names)
     return index_features, index_names
@@ -78,7 +104,28 @@ def generate_randomized_fiq_caption(flattened_captions: List[str]) -> List[str]:
         else:
             captions.append(f"{flattened_captions[i + 1].strip('.?, ').capitalize()}")
     return captions
-
+def generate_randomized_fiq_caption_blip(flattened_captions: List[str],txt_processors:callable) -> List[str]:
+    """
+    Function which randomize the FashionIQ training captions in four way: (a) cap1 and cap2 (b) cap2 and cap1 (c) cap1
+    (d) cap2
+    :param flattened_captions: the list of caption to randomize, note that the length of such list is 2*batch_size since
+     to each triplet are associated two captions
+    :return: the randomized caption list (with length = batch_size)
+    """
+    captions = []
+    for i in range(0, len(flattened_captions), 2):
+        random_num = random.random()
+        caption =''
+        if random_num < 0.25:
+            caption=f"{flattened_captions[i].strip('.?, ').capitalize()} and {flattened_captions[i + 1].strip('.?, ')}"
+        elif 0.25 < random_num < 0.5:
+            caption=f"{flattened_captions[i + 1].strip('.?, ').capitalize()} and {flattened_captions[i].strip('.?, ')}"
+        elif 0.5 < random_num < 0.75:
+            caption=f"{flattened_captions[i].strip('.?, ').capitalize()}"
+        else:
+            caption=f"{flattened_captions[i + 1].strip('.?, ').capitalize()}"
+        captions.append(txt_processors(caption))
+    return captions
 
 def collate_fn(batch: list):
     """
