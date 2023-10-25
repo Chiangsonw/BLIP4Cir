@@ -283,7 +283,7 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
     #     raise ValueError("encoder parameter should be in ['text', 'image', both']")
     if encoder == 'text':
         print('Only the blip text encoder will be fine-tuned')
-        for param in blip_model.vision_encoder.parameters():
+        for param in blip_model.visual_encoder.parameters():
             param.requires_grad = False
         for param in blip_model.Qformer.bert.parameters():
             param.requires_grad = True
