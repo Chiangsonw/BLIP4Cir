@@ -330,38 +330,24 @@ def blip_finetune_cirr(num_epochs: int, learning_rate: float, batch_size: int,
                 image_temp=[]
                 text_temp=[]
                 # Extract the features, compute the logits and the loss
-                # with torch.cuda.amp.autocast():
-                #     reference_sample = {"image": reference_images, "text_input":text_temp}
-                #     reference_features = blip_model.extract_features(reference_sample, mode="image").image_embeds_proj[:,0,:]
+                with torch.cuda.amp.autocast():
+                    reference_sample = {"image": reference_images, "text_input":text_temp}
+                    reference_features = blip_model.extract_features(reference_sample, mode="image").image_embeds_proj[:,0,:]
 
-                #     text_sample = {"image": image_temp, "text_input": captions}
-                #     text_features = blip_model.extract_features(text_sample, mode="text").text_embeds_proj[:,0,:]
+                    text_sample = {"image": image_temp, "text_input": captions}
+                    text_features = blip_model.extract_features(text_sample, mode="text").text_embeds_proj[:,0,:]
 
-                #     target_sample = {"image": target_images, "text_input":text_temp}
-                #     target_features = F.normalize(blip_model.extract_features(target_sample, mode="image").image_embeds_proj[:,0,:], dim=-1)
-                #     predicted_features = F.normalize(combining_function(reference_features, text_features), dim=-1)
+                    target_sample = {"image": target_images, "text_input":text_temp}
+                    target_features = F.normalize(blip_model.extract_features(target_sample, mode="image").image_embeds_proj[:,0,:], dim=-1)
+                    predicted_features = F.normalize(combining_function(reference_features, text_features), dim=-1)
 
-                #     logits = 100 * predicted_features @ target_features.T
-                #     ground_truth = torch.arange(images_in_batch, dtype=torch.long, device=device)    
-                #     loss = crossentropy_criterion(logits, ground_truth)
-                #     loss.requires_grad = True
-                #     loss = torch.nan_to_num(loss)
+                    logits = 100 * predicted_features @ target_features.T
+                    ground_truth = torch.arange(images_in_batch, dtype=torch.float, device=device)    
+                    loss = crossentropy_criterion(logits, ground_truth)
+                    loss.requires_grad = True
+                    torch.nan_to_num(loss)
 
-                reference_sample = {"image": reference_images, "text_input":text_temp}
-                reference_features = blip_model.extract_features(reference_sample, mode="image").image_embeds_proj[:,0,:]
-
-                text_sample = {"image": image_temp, "text_input": captions}
-                text_features = blip_model.extract_features(text_sample, mode="text").text_embeds_proj[:,0,:]
-
-                target_sample = {"image": target_images, "text_input":text_temp}
-                target_features = F.normalize(blip_model.extract_features(target_sample, mode="image").image_embeds_proj[:,0,:], dim=-1)
-                predicted_features = F.normalize(combining_function(reference_features, text_features), dim=-1)
-
-                logits = 100 * predicted_features @ target_features.T
-                ground_truth = torch.arange(images_in_batch, dtype=torch.long, device=device)    
-                loss = crossentropy_criterion(logits, ground_truth)
-                loss.requires_grad = True
-                torch.nan_to_num(loss)
+                loss.float()
 
                 # Backpropagate and update the weights
                 scaler.scale(loss).backward()
