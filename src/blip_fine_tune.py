@@ -21,7 +21,8 @@ from utils import collate_fn, update_train_running_results, set_train_bar_descri
 from validate import compute_cirr_val_metrics, compute_fiq_val_metrics,compute_fiq_val_metrics_blip
 from lavis.models import load_model_and_preprocess
 
-base_path = Path('/data/zhouyinan/CLIP4Cir')
+base_path = Path('/home/lmj/xintong/BLIP4Cir')
+
 def blip_finetune_fiq(train_dress_types: List[str], val_dress_types: List[str],
                       num_epochs: int, blip_model_name: str, learning_rate: float, batch_size: int,
                       validation_frequency: int, transform: str, save_training: bool, encoder: str, save_best: bool,
@@ -262,50 +263,52 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
     with open(training_path / "training_hyperparameters.json", 'w+') as file:
         json.dump(training_hyper_params, file, sort_keys=True, indent=4)
 
-    blip_model, blip_preprocess = blip.load(blip_model_name, device=device, jit=False)
+    # blip_model, blip_preprocess = blip.load(blip_model_name, device=device, jit=False)
+    blip_model, vis_processors, txt_processors = load_model_and_preprocess(name=blip_model_name, model_type="pretrain", is_eval=False, device=device)
 
-    if encoder == 'text':
-        print('Only the blip text encoder will be fine-tuned')
-        for param in blip_model.visual.parameters():
-            param.requires_grad = False
-    elif encoder == 'image':
-        print('Only the blip image encoder will be fine-tuned')
-        for param in blip_model.parameters():
-            param.requires_grad = False
-        for param in blip_model.visual.parameters():
-            param.requires_grad = True
-    elif encoder == 'both':
-        print('Both blip encoders will be fine-tuned')
-    else:
-        raise ValueError("encoder parameter should be in ['text', 'image', both']")
+
+    # if encoder == 'text':
+    #     print('Only the blip text encoder will be fine-tuned')
+    #     for param in blip_model.visual.parameters():
+    #         param.requires_grad = False
+    # elif encoder == 'image':
+    #     print('Only the blip image encoder will be fine-tuned')
+    #     for param in blip_model.parameters():
+    #         param.requires_grad = False
+    #     for param in blip_model.visual.parameters():
+    #         param.requires_grad = True
+    # elif encoder == 'both':
+    #     print('Both blip encoders will be fine-tuned')
+    # else:
+    #     raise ValueError("encoder parameter should be in ['text', 'image', both']")
 
     blip_model.eval().float()
-    input_dim = blip_model.visual.input_resolution
 
-    if transform == "blip":
-        preprocess = blip_preprocess
-        print('blip default preprocess pipeline is used')
-    elif transform == "squarepad":
-        preprocess = squarepad_transform(input_dim)
-        print('Square pad preprocess pipeline is used')
-    elif transform == "targetpad":
-        target_ratio = kwargs['target_ratio']
-        preprocess = targetpad_transform(target_ratio, input_dim)
-        print(f'Target pad with {target_ratio = } preprocess pipeline is used')
-    else:
-        raise ValueError("Preprocess transform should be in ['blip', 'squarepad', 'targetpad']")
+
+    # if transform == "blip":
+    #     preprocess = blip_preprocess
+    #     print('blip default preprocess pipeline is used')
+    # elif transform == "squarepad":
+    #     preprocess = squarepad_transform(input_dim)
+    #     print('Square pad preprocess pipeline is used')
+    # elif transform == "targetpad":
+    #     target_ratio = kwargs['target_ratio']
+    #     preprocess = targetpad_transform(target_ratio, input_dim)
+    #     print(f'Target pad with {target_ratio = } preprocess pipeline is used')
+    # else:
+    #     raise ValueError("Preprocess transform should be in ['blip', 'squarepad', 'targetpad']")
 
     # Define the validation datasets
-    relative_val_dataset = CIRRDataset('val', 'relative', preprocess)
-    classic_val_dataset = CIRRDataset('val', 'classic', preprocess)
+    relative_val_dataset = CIRRDataset('val', 'relative', vis_processors)
+    classic_val_dataset = CIRRDataset('val', 'classic', vis_processors)
 
     # When fine-tuning only the text encoder we can precompute the index features since they do not change over
     # the epochs
-    # if encoder == 'text':
-    #     val_index_features, val_index_names = extract_index_features(classic_val_dataset, blip_model)
+    if encoder == 'text':
+        val_index_features, val_index_names = extract_index_features_blip(classic_val_dataset, blip_model)
 
     # Define the train dataset and the combining function
-    relative_train_dataset = CIRRDataset('train', 'relative', preprocess)
+    relative_train_dataset = CIRRDataset('train', 'relative', vis_processors)
     relative_train_loader = DataLoader(dataset=relative_train_dataset, batch_size=batch_size,
                                        num_workers=multiprocessing.cpu_count(), pin_memory=False, collate_fn=collate_fn,
                                        drop_last=True, shuffle=True)
@@ -340,15 +343,14 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
 
                 reference_images = reference_images.to(device, non_blocking=True)
                 target_images = target_images.to(device, non_blocking=True)
+                text_inputs = txt_processors["eval"](captions)
 
                 # Extract the features, compute the logits and the loss
                 with torch.cuda.amp.autocast():
-                    reference_features = blip_model.encode_image(reference_images)
-                    text_inputs = blip.tokenize(captions, context_length=77, truncate=True).to(device,
-                                                                                               non_blocking=True)
-                    text_features = blip_model.encode_text(text_inputs)
+                    reference_features = blip_model.extract_features({"image":reference_images}, mode="image").image_embeds_proj[:,0,:]
+                    target_features = F.normalize(blip_model.extract_features({"image":target_images}, mode="image").image_embeds_proj[:,0,:], dim=-1)
+                    text_features = blip_model.extract_features({"text":text_inputs}, mode="text").text_embeds_proj[:,0,:]
 
-                    target_features = F.normalize(blip_model.encode_image(target_images), dim=-1)
                     predicted_features = combining_function(reference_features, text_features)
 
                     logits = 100 * predicted_features @ target_features.T

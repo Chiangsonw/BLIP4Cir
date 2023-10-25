@@ -9,7 +9,7 @@ from torch.utils.data import Dataset
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 
 # base_path = Path(__file__).absolute().parents[1].absolute()
-base_path = Path('/data/zhouyinan/data_all')
+base_path = Path('/home/lmj/xintong')
 
 
 def _convert_image_to_rgb(image):
@@ -232,11 +232,11 @@ class CIRRDataset(Dataset):
             raise ValueError("mode should be in ['relative', 'classic']")
 
         # get triplets made by (reference_image, target_image, relative caption)
-        with open(base_path  / 'cirr' / 'captions' / f'cap.rc2.{split}.json') as f:
+        with open(base_path / 'cirr_datasets' / 'cirr' / 'captions' / f'cap.rc2.{split}.json') as f:
             self.triplets = json.load(f)
 
         # get a mapping from image name to relative path
-        with open(base_path / 'cirr' / 'image_splits' / f'split.rc2.{split}.json') as f:
+        with open(base_path / 'cirr_datasets'  / 'cirr' / 'image_splits' / f'split.rc2.{split}.json') as f:
             self.name_to_relpath = json.load(f)
 
         print(f"CIRR {split} dataset in {mode} mode initialized")
@@ -249,10 +249,10 @@ class CIRRDataset(Dataset):
                 rel_caption = self.triplets[index]['caption']
 
                 if self.split == 'train':
-                    reference_image_path = base_path / 'cirr' / self.name_to_relpath[reference_name]
+                    reference_image_path = base_path / 'cirr_datasets' / self.name_to_relpath[reference_name]
                     reference_image = self.preprocess(PIL.Image.open(reference_image_path).convert("RGB"))
                     target_hard_name = self.triplets[index]['target_hard']
-                    target_image_path = base_path / 'cirr' / self.name_to_relpath[target_hard_name]
+                    target_image_path = base_path / 'cirr_datasets' / self.name_to_relpath[target_hard_name]
                     target_image = self.preprocess(PIL.Image.open(target_image_path).convert("RGB"))
                     return reference_image, target_image, rel_caption
 
