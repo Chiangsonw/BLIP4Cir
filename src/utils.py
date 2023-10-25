@@ -25,11 +25,11 @@ def extract_index_features_blip(dataset: Union[CIRRDataset, FashionIQDataset], m
     :return: a tensor of features and a list of images
     """
     # feature_dim = model.visual.output_dim
-    feature_dim = 768
+    feature_dim = 256
 
     classic_val_loader = DataLoader(dataset=dataset, batch_size=32, num_workers=multiprocessing.cpu_count(),
                                     pin_memory=True, collate_fn=collate_fn)
-    index_features = torch.empty((0,32, feature_dim)).to(device, non_blocking=True)
+    index_features = torch.empty((0,feature_dim)).to(device, non_blocking=True)
     index_names = []
     if isinstance(dataset, CIRRDataset):
         print(f"extracting CIRR {dataset.split} index features")
