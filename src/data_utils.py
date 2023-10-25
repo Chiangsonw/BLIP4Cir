@@ -269,7 +269,7 @@ class CIRRDataset(Dataset):
 
             elif self.mode == 'classic':
                 image_name = list(self.name_to_relpath.keys())[index]
-                image_path = base_path / 'cirr' / self.name_to_relpath[image_name]
+                image_path = base_path / 'cirr_datasets' / self.name_to_relpath[image_name]
                 im = PIL.Image.open(image_path).convert("RGB")
                 image = self.preprocess(im)
                 return image_name, image
