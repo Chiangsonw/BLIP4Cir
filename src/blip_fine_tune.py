@@ -361,7 +361,7 @@ def blip_finetune_cirr(num_epochs: int, learning_rate: float, batch_size: int,
                 ground_truth = torch.arange(images_in_batch, dtype=torch.long, device=device)    
                 loss = crossentropy_criterion(logits, ground_truth)
                 loss.requires_grad = True
-                loss = torch.nan_to_num(loss)
+                torch.nan_to_num(loss)
 
                 # Backpropagate and update the weights
                 scaler.scale(loss).backward()
