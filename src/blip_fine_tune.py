@@ -270,9 +270,9 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
     if encoder == 'text':
         print('Only the blip text encoder will be fine-tuned')
         for param in blip_model.parameters():
+            param.requires_grad = False
+        for param in blip_model.text_proj.parameters():
             param.requires_grad = True
-        # for param in blip_model.text_proj.parameters():
-        #     param.requires_grad = True
         # for param in blip_model.vision_proj.parameters():
         #     param.requires_grad = True
 
@@ -344,7 +344,7 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
                     
                 # Backpropagate and update the weights
                     
-                loss.requires_grad_(True) 
+                # loss.requires_grad_(True) 
                 scaler.scale(loss).backward()
                 print("text grad :",text_features.grad)
                 print("reference grad :",reference_features.grad)
