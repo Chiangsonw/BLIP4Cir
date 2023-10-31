@@ -273,8 +273,9 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
             param.requires_grad = False
         for param in blip_model.text_proj.parameters():
             param.requires_grad = True
+        for param in blip_model.vision_proj.parameters():
+            param.requires_grad = True
 
-    blip_model.eval().float()
 
 
     # Define the validation datasets
@@ -330,6 +331,7 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
                 reference_images = reference_images.to(device, non_blocking=True)
                 target_images = target_images.to(device, non_blocking=True)
                 text_inputs = list(captions)
+                
 
                 # Extract the features, compute the logits and the loss
                 with torch.cuda.amp.autocast():
@@ -337,11 +339,7 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
                     reference_features = blip_model.extract_features({"image":reference_images}, mode="image").image_embeds_proj[:,0,:]
                     target_features = F.normalize(blip_model.extract_features({"image":target_images}, mode="image").image_embeds_proj[:,0,:], dim=-1)
                     text_features = blip_model.extract_features({"text_input":text_inputs}, mode="text").text_embeds_proj[:,0,:]
-
-                    reference_features.requires_grad = True
-                    target_features.requires_grad = True
-                    text_features.requires_grad = True
-                
+       
                     # predicted_features = combining_function(reference_features, text_features)
 
                     # logits = 100 * predicted_features @ target_features.T
@@ -353,7 +351,6 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
                     
                 # loss.requires_grad_(True) 
                 scaler.scale(loss).backward()
-                print("loss grad :",loss.grad)
                 print("text grad :",text_features.grad)
                 print("reference grad :",reference_features.grad)
                 print("target grad :",target_features.grad)
