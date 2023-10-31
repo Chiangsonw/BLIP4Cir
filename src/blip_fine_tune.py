@@ -336,6 +336,8 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
     training_log_frame = pd.DataFrame()
     validation_log_frame = pd.DataFrame()
 
+    torch.autograd.set_detect_anomaly(True)
+
     for epoch in range(num_epochs):
         with experiment.train():
             train_running_results = {'images_in_epoch': 0, 'accumulated_train_loss': 0}
@@ -349,6 +351,8 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
                 reference_images = reference_images.to(device, non_blocking=True)
                 target_images = target_images.to(device, non_blocking=True)
                 text_inputs = list(captions)
+
+
                 print(len(text_inputs))
 
                 # Extract the features, compute the logits and the loss
@@ -357,6 +361,10 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
                         reference_features = blip_model.extract_features({"image":reference_images}, mode="image").image_embeds_proj[:,0,:]
                         target_features = F.normalize(blip_model.extract_features({"image":target_images}, mode="image").image_embeds_proj[:,0,:], dim=-1)
                         text_features = blip_model.extract_features({"text_input":text_inputs}, mode="text").text_embeds_proj[:,0,:]
+
+                        assert not torch.any(torch.isnan(reference_features))
+                        assert not torch.any(torch.isnan(target_features))
+                        assert not torch.any(torch.isnan(text_features))
 
                         predicted_features = combining_function(reference_features, text_features)
 
