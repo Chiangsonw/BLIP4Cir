@@ -271,9 +271,9 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
         print('Only the blip text encoder will be fine-tuned')
         for param in blip_model.parameters():
             param.requires_grad = False
-        for param in blip_model.Qformer.bert():
+        for param in blip_model.Qformer.bert.parameters():
             param.requires_grad = True
-        for param in blip_model.text_proj():
+        for param in blip_model.text_proj.parameters():
             param.requires_grad = True
 
 
