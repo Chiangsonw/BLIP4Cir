@@ -330,9 +330,11 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
                 # Extract the features, compute the logits and the loss
                 with torch.cuda.amp.autocast():
 
-                    reference_features = blip_model.extract_features({"image":reference_images}, mode="image").image_embeds_proj[:,0,:]
+                    reference_features = blip_model.extract_features({"image":reference_images}, mode="image").image_embeds_proj[:,0,:].to(device, )
                     target_features = F.normalize(blip_model.extract_features({"image":target_images}, mode="image").image_embeds_proj[:,0,:], dim=-1)
                     text_features = blip_model.extract_features({"text_input":text_inputs}, mode="text").text_embeds_proj[:,0,:]
+                    print(reference_features.requires_grad)
+                    print(reference_features.grad)
        
                     # predicted_features = combining_function(reference_features, text_features)
 
@@ -349,9 +351,9 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
                 print("reference grad :",reference_features.grad)
                 print("target grad :",target_features.grad)
 
-                for name, param in blip_model.named_parameters():
-                    if param.requires_grad:
-                        print(name, ",grad=",param.grad)
+                # for name, param in blip_model.named_parameters():
+                #     if param.requires_grad:
+                #         print(name, ",grad=",param.grad)
 
                 scaler.step(optimizer)
                 scaler.update()
