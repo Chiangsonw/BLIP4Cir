@@ -339,11 +339,15 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
                     text_features = blip_model.extract_features({"text_input":text_inputs}, mode="text").text_embeds_proj[:,0,:]
                     print("reference_features", reference_features.requires_grad)
                     print("target_features", target_features.requires_grad)
-                    print("text_features", predicted_features.requires_grad)
+                    print("text_features", text_features.requires_grad)
+                    reference_features.requires_grad = True
+                    target_features.requires_grad = True
                     text_features.requires_grad = True
                     
                     predicted_features = combining_function(reference_features, text_features)
+                    
                     print("predicted_features", predicted_features.requires_grad)
+                    
                     logits = 100 * predicted_features @ target_features.T
                     print("logits", logits.requires_grad)
                     ground_truth = torch.arange(images_in_batch, dtype=torch.long, device=device)
