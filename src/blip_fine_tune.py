@@ -343,9 +343,11 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
                     reference_features.requires_grad = True
                     target_features.requires_grad = True
                     text_features.requires_grad = True
+                    print("reference_features", reference_features.requires_grad)
+                    print("target_features", target_features.requires_grad)
+                    print("text_features", text_features.requires_grad)
                     
                     predicted_features = combining_function(reference_features, text_features)
-                    predicted_features.requires_grad = True
                     print("predicted_features", predicted_features.requires_grad)
                     
                     logits = 100 * predicted_features @ target_features.T
@@ -356,8 +358,6 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
 
                 # Backpropagate and update the weights
                     
-
-
                 loss.requires_grad_(True) 
                 scaler.scale(loss).backward()
 
