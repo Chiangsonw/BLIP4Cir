@@ -342,27 +342,21 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
                     target_features.requires_grad = True
                     text_features.requires_grad = True
                 
-                    predicted_features = combining_function(reference_features, text_features)
+                    # predicted_features = combining_function(reference_features, text_features)
 
-                    logits = 100 * predicted_features @ target_features.T
+                    # logits = 100 * predicted_features @ target_features.T
                     ground_truth = torch.arange(images_in_batch, dtype=torch.long, device=device)
-                    loss = crossentropy_criterion(logits, ground_truth)
-
+                    # loss = crossentropy_criterion(logits, ground_truth)
+                    loss = crossentropy_criterion(100 * combining_function(reference_features, text_features) @ target_features.T, ground_truth)
 
                 # Backpropagate and update the weights
                     
                 # loss.requires_grad_(True) 
                 scaler.scale(loss).backward()
-                print("loss grad_fn", loss.grad_fn)
                 print("loss grad :",loss.grad)
-                print("logits grad_fn", logits.grad_fn)
-                print("logits grad :",logits.grad)
-                print("predicted grad_fn :",predicted_features.grad_fn)
-                print("predicted grad :",predicted_features.grad) 
                 print("text grad :",text_features.grad)
                 print("reference grad :",reference_features.grad)
                 print("target grad :",target_features.grad)
-
 
                 for name, param in blip_model.named_parameters():
                     if param.requires_grad:
