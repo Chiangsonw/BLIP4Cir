@@ -267,41 +267,14 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
     blip_model, vis_processors, txt_processors = load_model_and_preprocess(name="blip2_feature_extractor", model_type="pretrain", is_eval=False, device=device)
 
 
-    # if encoder == 'text':
-    #     print('Only the blip text encoder will be fine-tuned')
-    #     for param in blip_model.visual.parameters():
-    #         param.requires_grad = False
-    # elif encoder == 'image':
-    #     print('Only the blip image encoder will be fine-tuned')
-    #     for param in blip_model.parameters():
-    #         param.requires_grad = False
-    #     for param in blip_model.visual.parameters():
-    #         param.requires_grad = True
-    # elif encoder == 'both':
-    #     print('Both blip encoders will be fine-tuned')
-    # else:
-    #     raise ValueError("encoder parameter should be in ['text', 'image', both']")
     if encoder == 'text':
         print('Only the blip text encoder will be fine-tuned')
-        for param in blip_model.visual_encoder.parameters():
+        for param in blip_model.parameters():
             param.requires_grad = False
-        for param in blip_model.Qformer.bert.parameters():
+        for param in blip_model.text_proj.parameters():
             param.requires_grad = True
     blip_model.eval().float()
 
-
-    # if transform == "blip":
-    #     preprocess = blip_preprocess
-    #     print('blip default preprocess pipeline is used')
-    # elif transform == "squarepad":
-    #     preprocess = squarepad_transform(input_dim)
-    #     print('Square pad preprocess pipeline is used')
-    # elif transform == "targetpad":
-    #     target_ratio = kwargs['target_ratio']
-    #     preprocess = targetpad_transform(target_ratio, input_dim)
-    #     print(f'Target pad with {target_ratio = } preprocess pipeline is used')
-    # else:
-    #     raise ValueError("Preprocess transform should be in ['blip', 'squarepad', 'targetpad']")
 
     # Define the validation datasets
     relative_val_dataset = CIRRDataset('val', 'relative', vis_processors["eval"],txt_processors["eval"])
@@ -368,8 +341,6 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
 
                     ground_truth = torch.arange(images_in_batch, dtype=torch.long, device=device)
                     loss = crossentropy_criterion(logits, ground_truth)
-                    print(loss.max())
-                    print(loss.min())
 
                 # Backpropagate and update the weights
                 with torch.autograd.detect_anomaly():
