@@ -270,9 +270,9 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
     if encoder == 'text':
         print('Only the blip text encoder will be fine-tuned')
         for param in blip_model.parameters():
-            param.requires_grad = False
-        for param in blip_model.text_proj.parameters():
             param.requires_grad = True
+        # for param in blip_model.text_proj.parameters():
+        #     param.requires_grad = True
 
     blip_model.train().float()
 
