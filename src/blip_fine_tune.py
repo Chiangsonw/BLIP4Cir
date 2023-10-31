@@ -273,7 +273,8 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
             param.requires_grad = False
         for param in blip_model.text_proj.parameters():
             param.requires_grad = True
-    blip_model.eval().float()
+
+    blip_model.train().float()
 
 
     # Define the validation datasets
@@ -343,11 +344,11 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
                     loss = crossentropy_criterion(logits, ground_truth)
 
                 # Backpropagate and update the weights
-                with torch.autograd.detect_anomaly():
-                    loss.requires_grad_(True) 
-                    scaler.scale(loss).backward()
-                    scaler.step(optimizer)
-                    scaler.update()
+
+                # loss.requires_grad_(True) 
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
 
                 experiment.log_metric('step_loss', loss.detach().cpu().item(), step=step)
                 update_train_running_results(train_running_results, loss, images_in_batch)
