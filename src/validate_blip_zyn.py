@@ -1,10 +1,11 @@
+import os 
+os.environ['CUDA_VISIBLE_DEVICES'] = '8'
 import multiprocessing
 from argparse import ArgumentParser
 from operator import itemgetter
 from pathlib import Path
 from statistics import mean
 from typing import List, Tuple
-
 import clip
 import numpy as np
 import torch
@@ -15,8 +16,9 @@ from tqdm import tqdm
 
 from data_utils import squarepad_transform, FashionIQDataset, targetpad_transform, CIRRDataset
 from combiner import Combiner
-from utils import extract_index_features, collate_fn, element_wise_sum, device
+from utils import extract_index_features_blip, collate_fn, element_wise_sum, device
 
+from lavis.models import load_model_and_preprocess
 
 def compute_fiq_val_metrics(relative_val_dataset: FashionIQDataset, clip_model: CLIP, index_features: torch.tensor,
                             index_names: List[str], combining_function: callable) -> Tuple[float, float]:
@@ -56,7 +58,45 @@ def compute_fiq_val_metrics(relative_val_dataset: FashionIQDataset, clip_model: 
 
     return recall_at10, recall_at50
 
+def compute_fiq_val_metrics_blip(relative_val_dataset: FashionIQDataset, clip_model: CLIP, index_features: torch.tensor,
+                            index_names: List[str], combining_function: callable,txt_processors:callable) -> Tuple[float, float]:
+    """
+    Compute validation metrics on FashionIQ dataset
+    :param relative_val_dataset: FashionIQ validation dataset in relative mode
+    :param clip_model: CLIP model
+    :param index_features: validation index features
+    :param index_names: validation index names
+    :param combining_function: function which takes as input (image_features, text_features) and outputs the combined
+                            features
+    :return: the computed validation metrics
+    """
 
+    # Generate predictions
+    predicted_features, target_names = generate_fiq_val_predictions_blip(clip_model, relative_val_dataset,
+                                                                    combining_function, index_names, index_features,txt_processors)
+
+    print(f"Compute FashionIQ {relative_val_dataset.dress_types} validation metrics")
+
+    # Normalize the index features
+    # index_features = F.normalize(index_features, dim=-1).float()
+    dis = 0
+    for i in range(index_features.shape[1]):
+        dis +=predicted_features[:,i,:] @ F.normalize(index_features[:,i,:], dim=-1).float().T
+    # Compute the distances and sort the results
+    distances = 1 - dis/index_features.shape[1]
+    sorted_indices = torch.argsort(distances, dim=-1).cpu()
+    sorted_index_names = np.array(index_names)[sorted_indices]
+
+    # Compute the ground-truth labels wrt the predictions
+    labels = torch.tensor(
+        sorted_index_names == np.repeat(np.array(target_names), len(index_names)).reshape(len(target_names), -1))
+    assert torch.equal(torch.sum(labels, dim=-1).int(), torch.ones(len(target_names)).int())
+
+    # Compute the metrics
+    recall_at10 = (torch.sum(labels[:, :10]) / len(labels)).item() * 100
+    recall_at50 = (torch.sum(labels[:, :50]) / len(labels)).item() * 100
+
+    return recall_at10, recall_at50
 def generate_fiq_val_predictions(clip_model: CLIP, relative_val_dataset: FashionIQDataset,
                                  combining_function: callable, index_names: List[str], index_features: torch.tensor) -> \
         Tuple[torch.tensor, List[str]]:
@@ -109,8 +149,61 @@ def generate_fiq_val_predictions(clip_model: CLIP, relative_val_dataset: Fashion
 
     return predicted_features, target_names
 
+def generate_fiq_val_predictions_blip(model: CLIP, relative_val_dataset: FashionIQDataset,
+                                 combining_function: callable, index_names: List[str], index_features: torch.tensor,txt_processors:callable) -> \
+        Tuple[torch.tensor, List[str]]:
+    """
+    Compute FashionIQ predictions on the validation set
+    :param model: CLIP model
+    :param relative_val_dataset: FashionIQ validation dataset in relative mode
+    :param combining_function: function which takes as input (image_features, text_features) and outputs the combined
+                            features
+    :param index_features: validation index features
+    :param index_names: validation index names
+    :return: predicted features and target names
+    """
+    print(f"Compute FashionIQ {relative_val_dataset.dress_types} validation predictions")
 
-def fashioniq_val_retrieval(dress_type: str, combining_function: callable, clip_model: CLIP, preprocess: callable):
+    relative_val_loader = DataLoader(dataset=relative_val_dataset, batch_size=32,
+                                     num_workers=multiprocessing.cpu_count(), pin_memory=True, collate_fn=collate_fn,
+                                     shuffle=False)
+
+    # Get a mapping from index names to index features
+    name_to_feat = dict(zip(index_names, index_features))
+
+    # Initialize predicted features and target names
+    predicted_features = torch.empty((0, 32,768)).to(device, non_blocking=True)
+    target_names = []
+
+    for reference_names, batch_target_names, captions in tqdm(relative_val_loader):  # Load data
+
+        # Concatenate the captions in a deterministic way
+        flattened_captions: list = np.array(captions).T.flatten().tolist()
+        input_captions = [
+            txt_processors(f"{flattened_captions[i].strip('.?, ').capitalize()} and {flattened_captions[i + 1].strip('.?, ')}") for
+            i in range(0, len(flattened_captions), 2)]
+        text_inputs =input_captions
+        # text_inputs = clip.tokenize(input_captions, context_length=77).to(device, non_blocking=True)
+
+        # Compute the predicted features
+        with torch.no_grad():
+            text_features = model.extract_features({"text_input":text_inputs}, mode="text").text_embeds
+            # Check whether a single element is in the batch due to the exception raised by torch.stack when used with
+            # a single tensor
+            if text_features.shape[0] == 1:
+                reference_image_features = itemgetter(*reference_names)(name_to_feat).unsqueeze(0)
+            else:
+                reference_image_features = torch.stack(itemgetter(*reference_names)(
+                    name_to_feat))  # To avoid unnecessary computation retrieve the reference image features directly from the index features
+                
+            batch_predicted_features = torch.stack([F.normalize(combining_function(reference_image_features[:,i,:], text_features[:,0,:]), dim=-1) for i in range(reference_image_features.shape[1]) ], dim=1)
+
+        predicted_features = torch.vstack((predicted_features, batch_predicted_features))
+        target_names.extend(batch_target_names)
+
+    return predicted_features, target_names
+
+def fashioniq_val_retrieval_blip(dress_type: str, combining_function: callable, clip_model: CLIP, preprocess: callable,txt_processors:callable):
     """
     Perform retrieval on FashionIQ validation set computing the metrics. To combine the features the `combining_function`
     is used
@@ -125,11 +218,69 @@ def fashioniq_val_retrieval(dress_type: str, combining_function: callable, clip_
 
     # Define the validation datasets and extract the index features
     classic_val_dataset = FashionIQDataset('val', [dress_type], 'classic', preprocess)
-    index_features, index_names = extract_index_features(classic_val_dataset, clip_model)
+    index_features, index_names = extract_index_features_blip(classic_val_dataset, clip_model)
     relative_val_dataset = FashionIQDataset('val', [dress_type], 'relative', preprocess)
 
-    return compute_fiq_val_metrics(relative_val_dataset, clip_model, index_features, index_names,
-                                   combining_function)
+    return compute_fiq_val_metrics_blip(relative_val_dataset, clip_model, index_features, index_names,
+                                   combining_function,txt_processors)
+
+
+def compute_cirr_val_metrics_blip(relative_val_dataset: CIRRDataset, clip_model: CLIP, index_features: torch.tensor,
+                             index_names: List[str], combining_function: callable,txt_processors:callable) -> Tuple[
+    float, float, float, float, float, float, float]:
+    """
+    Compute validation metrics on CIRR dataset
+    :param relative_val_dataset: CIRR validation dataset in relative mode
+    :param clip_model: CLIP model
+    :param index_features: validation index features
+    :param index_names: validation index names
+    :param combining_function: function which takes as input (image_features, text_features) and outputs the combined
+                            features
+    :return: the computed validation metrics
+    """
+    # Generate predictions
+    predicted_features, reference_names, target_names, group_members = \
+        generate_cirr_val_predictions_blip(clip_model, relative_val_dataset, combining_function, index_names, index_features,txt_processors)
+
+    print("Compute CIRR validation metrics")
+
+    dis = 0
+    for i in range(index_features.shape[1]):
+        dis +=predicted_features[:,i,:] @ F.normalize(index_features[:,i,:], dim=-1).float().T
+    # Compute the distances and sort the results
+    distances = 1 - dis/index_features.shape[1]
+    sorted_indices = torch.argsort(distances, dim=-1).cpu()
+    sorted_index_names = np.array(index_names)[sorted_indices]
+    print(len(reference_names))
+    print(len(target_names))
+
+    # Delete the reference image from the results
+    reference_mask = torch.tensor(
+        sorted_index_names != np.repeat(np.array(reference_names), len(index_names)).reshape(len(target_names), -1))
+    sorted_index_names = sorted_index_names[reference_mask].reshape(sorted_index_names.shape[0],
+                                                                    sorted_index_names.shape[1] - 1)
+    # Compute the ground-truth labels wrt the predictions
+    labels = torch.tensor(
+        sorted_index_names == np.repeat(np.array(target_names), len(index_names) - 1).reshape(len(target_names), -1))
+
+    # Compute the subset predictions and ground-truth labels
+    group_members = np.array(group_members)
+    group_mask = (sorted_index_names[..., None] == group_members[:, None, :]).sum(-1).astype(bool)
+    group_labels = labels[group_mask].reshape(labels.shape[0], -1)
+
+    assert torch.equal(torch.sum(labels, dim=-1).int(), torch.ones(len(target_names)).int())
+    assert torch.equal(torch.sum(group_labels, dim=-1).int(), torch.ones(len(target_names)).int())
+
+    # Compute the metrics
+    recall_at1 = (torch.sum(labels[:, :1]) / len(labels)).item() * 100
+    recall_at5 = (torch.sum(labels[:, :5]) / len(labels)).item() * 100
+    recall_at10 = (torch.sum(labels[:, :10]) / len(labels)).item() * 100
+    recall_at50 = (torch.sum(labels[:, :50]) / len(labels)).item() * 100
+    group_recall_at1 = (torch.sum(group_labels[:, :1]) / len(group_labels)).item() * 100
+    group_recall_at2 = (torch.sum(group_labels[:, :2]) / len(group_labels)).item() * 100
+    group_recall_at3 = (torch.sum(group_labels[:, :3]) / len(group_labels)).item() * 100
+
+    return group_recall_at1, group_recall_at2, group_recall_at3, recall_at1, recall_at5, recall_at10, recall_at50
 
 
 def compute_cirr_val_metrics(relative_val_dataset: CIRRDataset, blip_model, index_features: torch.tensor,
@@ -187,8 +338,59 @@ def compute_cirr_val_metrics(relative_val_dataset: CIRRDataset, blip_model, inde
 
     return group_recall_at1, group_recall_at2, group_recall_at3, recall_at1, recall_at5, recall_at10, recall_at50
 
+def generate_cirr_val_predictions_blip(clip_model: CLIP, relative_val_dataset: CIRRDataset,
+                                  combining_function: callable, index_names: List[str], index_features: torch.tensor,txt_processors:callable) -> \
+        Tuple[torch.tensor, List[str], List[str], List[List[str]]]:
+    """
+    Compute CIRR predictions on the validation set
+    :param clip_model: CLIP model
+    :param relative_val_dataset: CIRR validation dataset in relative mode
+    :param combining_function: function which takes as input (image_features, text_features) and outputs the combined
+                            features
+    :param index_features: validation index features
+    :param index_names: validation index names
+    :return: predicted features, reference names, target names and group members
+    """
+    print("Compute CIRR validation predictions")
+    relative_val_loader = DataLoader(dataset=relative_val_dataset, batch_size=32, num_workers=8,
+                                     pin_memory=True, collate_fn=collate_fn)
 
-def generate_cirr_val_predictions(blip_model, relative_val_dataset: CIRRDataset,
+    # Get a mapping from index names to index features
+    name_to_feat = dict(zip(index_names, index_features))
+
+    predicted_features = torch.empty((0, 32,768)).to(device, non_blocking=True)
+    target_names = []
+    group_members = []
+    reference_names = []
+
+    for batch_reference_names, batch_target_names, captions, batch_group_members in tqdm(relative_val_loader):  # Load data
+
+        # Concatenate the captions in a deterministic way
+
+        text_inputs =[txt_processors(i) for i in captions]
+        batch_group_members = np.array(batch_group_members).T.tolist()
+
+        # Compute the predicted features
+        with torch.no_grad():
+            text_features = clip_model.extract_features({"text_input":text_inputs}, mode="text").text_embeds
+            # Check whether a single element is in the batch due to the exception raised by torch.stack when used with
+            # a single tensor
+            if text_features.shape[0] == 1:
+                reference_image_features = itemgetter(*batch_reference_names)(name_to_feat).unsqueeze(0)
+            else:
+                reference_image_features = torch.stack(itemgetter(*batch_reference_names)(
+                    name_to_feat))  # To avoid unnecessary computation retrieve the reference image features directly from the index features
+                
+            batch_predicted_features = torch.stack([F.normalize(combining_function(reference_image_features[:,i,:], text_features[:,0,:]), dim=-1) for i in range(reference_image_features.shape[1]) ], dim=1)
+
+        predicted_features = torch.vstack((predicted_features, batch_predicted_features))
+        target_names.extend(batch_target_names)
+        group_members.extend(batch_group_members)
+        reference_names.extend(batch_reference_names)
+
+    return predicted_features,reference_names, target_names,group_members
+
+def generate_cirr_val_predictions(relative_val_dataset: CIRRDataset, blip_model,
                                   combining_function: callable, index_names: List[str], index_features: torch.tensor) -> \
         Tuple[torch.tensor, List[str], List[str], List[List[str]]]:
     """
@@ -217,13 +419,11 @@ def generate_cirr_val_predictions(blip_model, relative_val_dataset: CIRRDataset,
     for batch_reference_names, batch_target_names, captions, batch_group_members in tqdm(
             relative_val_loader):  # Load data
         
-        text_inputs = list(captions)
         batch_group_members = np.array(batch_group_members).T.tolist()
-        text_sample = {"text_input":text_inputs}
 
         # Compute the predicted features
         with torch.no_grad():
-            text_features = blip_model.extract_features(text_sample, mode="text").text_embeds_proj[:,0,:]
+            text_features = blip_model.extract 
             # Check whether a single element is in the batch due to the exception raised by torch.stack when used with
             # a single tensor
             if text_features.shape[0] == 1:
@@ -241,7 +441,7 @@ def generate_cirr_val_predictions(blip_model, relative_val_dataset: CIRRDataset,
     return predicted_features, reference_names, target_names, group_members
 
 
-def cirr_val_retrieval(combining_function: callable, blip_model, vision_preprocess, text_preprocess):
+def cirr_val_retrieval_blip(combining_function: callable, clip_model: CLIP, preprocess: callable,txt_processors:callable):
     """
     Perform retrieval on CIRR validation set computing the metrics. To combine the features the `combining_function`
     is used
@@ -251,15 +451,15 @@ def cirr_val_retrieval(combining_function: callable, blip_model, vision_preproce
     :param preprocess: preprocess pipeline
     """
 
-    blip_model = blip_model.float().eval()
+    clip_model = clip_model.float().eval()
 
     # Define the validation datasets and extract the index features
-    classic_val_dataset = CIRRDatasetBLIP('val', 'classic', vision_preprocess, text_preprocess)
-    index_features, index_names = extract_index_features(classic_val_dataset, blip_model)
-    relative_val_dataset = CIRRDatasetBLIP('val', 'relative', vision_preprocess, text_preprocess)
+    classic_val_dataset = CIRRDataset('val', 'classic', preprocess)
+    index_features, index_names = extract_index_features_blip(classic_val_dataset, clip_model)
+    relative_val_dataset = CIRRDataset('val', 'relative', preprocess)
 
-    return compute_cirr_val_metrics(relative_val_dataset, blip_model, index_features, index_names,
-                                    combining_function)
+    return compute_cirr_val_metrics_blip(relative_val_dataset, clip_model, index_features, index_names,
+                                    combining_function,txt_processors)
 
 
 def main():
@@ -270,51 +470,23 @@ def main():
     parser.add_argument("--combiner-path", type=Path, help="path to trained Combiner")
     parser.add_argument("--projection-dim", default=640 * 4, type=int, help='Combiner projection dim')
     parser.add_argument("--hidden-dim", default=640 * 8, type=int, help="Combiner hidden dim")
-    parser.add_argument("--clip-model-name", default="RN50x4", type=str, help="CLIP model to use, e.g 'RN50', 'RN50x4'")
-    parser.add_argument("--clip-model-path", type=Path, help="Path to the fine-tuned CLIP model")
-    parser.add_argument("--target-ratio", default=1.25, type=float, help="TargetPad target ratio")
-    parser.add_argument("--transform", default="targetpad", type=str,
-                        help="Preprocess pipeline, should be in ['clip', 'squarepad', 'targetpad'] ")
+
 
     args = parser.parse_args()
+    model, vis_processors, txt_processors = load_model_and_preprocess(name='blip2_feature_extractor', model_type="pretrain", is_eval=True, device=device)
+    model.eval()
+    model = model.float()
+    feature_dim = 768
 
-    clip_model, clip_preprocess = clip.load(args.clip_model_name, device=device, jit=False)
-    input_dim = clip_model.visual.input_resolution
-    feature_dim = clip_model.visual.output_dim
-
-    if args.clip_model_path:
-        print('Trying to load the CLIP model')
-        saved_state_dict = torch.load(args.clip_model_path, map_location=device)
-        clip_model.load_state_dict(saved_state_dict["CLIP"])
-        print('CLIP model loaded successfully')
-
-    if args.transform == 'targetpad':
-        print('Target pad preprocess pipeline is used')
-        preprocess = targetpad_transform(args.target_ratio, input_dim)
-    elif args.transform == 'squarepad':
-        print('Square pad preprocess pipeline is used')
-        preprocess = squarepad_transform(input_dim)
-    else:
-        print('CLIP default preprocess pipeline is used')
-        preprocess = clip_preprocess
-
-    if args.combining_function.lower() == 'sum':
-        if args.combiner_path:
-            print("Be careful, you are using the element-wise sum as combining_function but you have also passed a path"
-                  " to a trained Combiner. Such Combiner will not be used")
-        combining_function = element_wise_sum
-    elif args.combining_function.lower() == 'combiner':
-        combiner = Combiner(feature_dim, args.projection_dim, args.hidden_dim).to(device, non_blocking=True)
-        state_dict = torch.load(args.combiner_path, map_location=device)
-        combiner.load_state_dict(state_dict["Combiner"])
-        combiner.eval()
-        combining_function = combiner.combine_features
-    else:
-        raise ValueError("combiner_path should be in ['sum', 'combiner']")
+    combiner = Combiner(feature_dim, args.projection_dim, args.hidden_dim).to(device, non_blocking=True)
+    state_dict = torch.load(args.combiner_path, map_location=device)
+    combiner.load_state_dict(state_dict["Combiner"])
+    combiner.eval()
+    combining_function = combiner.combine_features
 
     if args.dataset.lower() == 'cirr':
         group_recall_at1, group_recall_at2, group_recall_at3, recall_at1, recall_at5, recall_at10, recall_at50 = \
-            cirr_val_retrieval(combining_function, clip_model, preprocess)
+            cirr_val_retrieval_blip(combining_function, model, vis_processors['eval'],txt_processors['eval'])
 
         print(f"{group_recall_at1 = }")
         print(f"{group_recall_at2 = }")
@@ -328,18 +500,18 @@ def main():
         average_recall10_list = []
         average_recall50_list = []
 
-        shirt_recallat10, shirt_recallat50 = fashioniq_val_retrieval('shirt', combining_function, clip_model,
-                                                                     preprocess)
+        shirt_recallat10, shirt_recallat50 = fashioniq_val_retrieval_blip('shirt', combining_function, model,
+                                                                     vis_processors['eval'],txt_processors['eval'])
         average_recall10_list.append(shirt_recallat10)
         average_recall50_list.append(shirt_recallat50)
 
-        dress_recallat10, dress_recallat50 = fashioniq_val_retrieval('dress', combining_function, clip_model,
-                                                                     preprocess)
+        dress_recallat10, dress_recallat50 = fashioniq_val_retrieval_blip('dress', combining_function, model,
+                                                                     vis_processors['eval'],txt_processors['eval'])
         average_recall10_list.append(dress_recallat10)
         average_recall50_list.append(dress_recallat50)
 
-        toptee_recallat10, toptee_recallat50 = fashioniq_val_retrieval('toptee', combining_function, clip_model,
-                                                                       preprocess)
+        toptee_recallat10, toptee_recallat50 = fashioniq_val_retrieval_blip('toptee', combining_function, model,
+                                                                       vis_processors['eval'],txt_processors['eval'])
         average_recall10_list.append(toptee_recallat10)
         average_recall50_list.append(toptee_recallat50)
 

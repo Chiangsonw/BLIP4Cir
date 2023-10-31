@@ -13,7 +13,7 @@ from clip.model import CLIP
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from data_utils import squarepad_transform, FashionIQDataset, targetpad_transform, CIRRDataset
+from data_utils import squarepad_transform, FashionIQDataset, targetpad_transform, CIRRDataset, CIRRDatasetBLIP
 from combiner import Combiner
 from utils import extract_index_features, collate_fn, element_wise_sum, device
 
@@ -132,8 +132,8 @@ def fashioniq_val_retrieval(dress_type: str, combining_function: callable, clip_
                                    combining_function)
 
 
-def compute_cirr_val_metrics(relative_val_dataset: CIRRDataset, blip_model, index_features: torch.tensor,
-                             index_names: List[str], combining_function: callable) -> Tuple[
+def compute_cirr_val_metrics(relative_val_dataset: CIRRDatasetBLIP, blip_model, index_features: torch.tensor,
+                             index_names: List[str], combining_function: callable, txt_processors) -> Tuple[
     float, float, float, float, float, float, float]:
     """
     Compute validation metrics on CIRR dataset
@@ -147,7 +147,7 @@ def compute_cirr_val_metrics(relative_val_dataset: CIRRDataset, blip_model, inde
     """
     # Generate predictions
     predicted_features, reference_names, target_names, group_members = \
-        generate_cirr_val_predictions(blip_model, relative_val_dataset, combining_function, index_names, index_features)
+        generate_cirr_val_predictions(blip_model, relative_val_dataset, combining_function, index_names, index_features, txt_processors)
 
     print("Compute CIRR validation metrics")
 
@@ -188,8 +188,8 @@ def compute_cirr_val_metrics(relative_val_dataset: CIRRDataset, blip_model, inde
     return group_recall_at1, group_recall_at2, group_recall_at3, recall_at1, recall_at5, recall_at10, recall_at50
 
 
-def generate_cirr_val_predictions(blip_model, relative_val_dataset: CIRRDataset,
-                                  combining_function: callable, index_names: List[str], index_features: torch.tensor) -> \
+def generate_cirr_val_predictions(blip_model, relative_val_dataset: CIRRDatasetBLIP,
+                                  combining_function: callable, index_names: List[str], index_features: torch.tensor, txt_processors) -> \
         Tuple[torch.tensor, List[str], List[str], List[List[str]]]:
     """
     Compute CIRR predictions on the validation set
@@ -217,9 +217,10 @@ def generate_cirr_val_predictions(blip_model, relative_val_dataset: CIRRDataset,
     for batch_reference_names, batch_target_names, captions, batch_group_members in tqdm(
             relative_val_loader):  # Load data
         
-        text_inputs = list(captions)
+        captions = captions.to(device)
+        captions = list(captions)
         batch_group_members = np.array(batch_group_members).T.tolist()
-        text_sample = {"text_input":text_inputs}
+        text_sample = {"image":[],"text_input":captions}
 
         # Compute the predicted features
         with torch.no_grad():

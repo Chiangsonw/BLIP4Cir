@@ -1,9 +1,5 @@
-CUDA_VISIABLE_DEVICES=0 python src/clip_fine_tune.py \
-   --dataset 'CIRR' \
-   --num-epochs 100 \
-   --encoder text \
-   --learning-rate 2e-6 \
-   --batch-size 128 \
-   --save-training \
-   --save-best \
-   --validation-frequency 1 
+python src/blip_fine_tune.py --dataset 'CIRR' --api-key ka8SmqInufhfVdSp802JDWKWi \
+--workspace zucuchiang --experiment-name blip-fine-tune --num-epochs 100 \
+--blip-model-name blip2_feature_extractor --encoder text --learning-rate 2e-6 \
+batch-size 64 --save-training --save-best --validation-frequency 1
+

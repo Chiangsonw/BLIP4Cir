@@ -18,7 +18,7 @@ from data_utils import base_path, squarepad_transform, targetpad_transform, CIRR
 
 from utils import collate_fn, update_train_running_results, set_train_bar_description, save_model, \
     extract_index_features,extract_index_features_blip, generate_randomized_fiq_caption, device, generate_randomized_fiq_caption_blip, element_wise_sum
-from validate_blip import compute_cirr_val_metrics, compute_fiq_val_metrics,compute_fiq_val_metrics_blip
+from src.validate_blip import compute_cirr_val_metrics, compute_fiq_val_metrics
 from lavis.models import load_model_and_preprocess
 
 base_path = Path('/home/lmj/xintong/BLIP4Cir')
@@ -271,11 +271,10 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
         print('Only the blip text encoder will be fine-tuned')
         for param in blip_model.parameters():
             param.requires_grad = False
-        for param in blip_model.text_proj.parameters():
+        for param in blip_model.Qformer.bert():
             param.requires_grad = True
-        # for param in blip_model.vision_proj.parameters():
-        #     param.requires_grad = True
-
+        for param in blip_model.text_proj():
+            param.requires_grad = True
 
 
     # Define the validation datasets
@@ -323,9 +322,7 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
                 optimizer.zero_grad()
 
                 reference_images = reference_images.to(device, non_blocking=True)
-                reference_images.requires_grad=True
                 target_images = target_images.to(device, non_blocking=True)
-                target_images.requires_grad=True
                 text_inputs = list(captions)
                 
                 # Extract the features, compute the logits and the loss
@@ -336,24 +333,13 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
                     text_features = blip_model.extract_features({"text_input":text_inputs}, mode="text").text_embeds_proj[:,0,:]
 
                     # predicted_features = combining_function(reference_features, text_features)
-
                     # logits = 100 * predicted_features @ target_features.T
                     ground_truth = torch.arange(images_in_batch, dtype=torch.long, device=device)
                     # loss = crossentropy_criterion(logits, ground_truth)
                     loss = crossentropy_criterion(100 * combining_function(reference_features, text_features) @ target_features.T, ground_truth)
                     
                 # Backpropagate and update the weights
-                    
-                # loss.requires_grad_(True) 
                 scaler.scale(loss).backward()
-                print("text grad :",text_features.grad)
-                print("reference grad :",reference_features.grad)
-                print("target grad :",target_features.grad)
-
-                # for name, param in blip_model.named_parameters():
-                #     if param.requires_grad:
-                #         print(name, ",grad=",param.grad)
-
                 scaler.step(optimizer)
                 scaler.update()
 
