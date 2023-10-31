@@ -353,9 +353,12 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
                     
                 # loss.requires_grad_(True) 
                 scaler.scale(loss).backward()
+                print("loss grad_fn", loss.grad_fn)
                 print("loss grad :",loss.grad)
+                print("logits grad_fn", logits.grad_fn)
                 print("logits grad :",logits.grad)
-                print("predicted grad :",predicted_features.grad)
+                print("predicted grad_fn :",predicted_features.grad_fn)
+                print("predicted grad :",predicted_features.grad) 
                 print("text grad :",text_features.grad)
                 print("reference grad :",reference_features.grad)
                 print("target grad :",target_features.grad)
