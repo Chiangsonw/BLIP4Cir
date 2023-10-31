@@ -302,7 +302,7 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
         if param.requires_grad:
             print(name, ",grad=",param.grad)
 
-    crossentropy_criterion = nn.CrossEntropyLoss().to(device, non_blockin=True, requires_grad=True)
+    crossentropy_criterion = nn.CrossEntropyLoss()
     scaler = torch.cuda.amp.GradScaler()
 
     # When save_best == True initialize the best results to zero
@@ -360,7 +360,7 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
                 print("reference grad :",reference_features.grad)
                 print("target grad :",target_features.grad)
 
-                
+
                 for name, param in blip_model.named_parameters():
                     if param.requires_grad:
                         print(name, ",grad=",param.grad)
