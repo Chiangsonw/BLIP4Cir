@@ -329,7 +329,7 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
 
                 reference_images = reference_images.to(device, non_blocking=True)
                 target_images = target_images.to(device, non_blocking=True)
-                text_inputs = list(captions).to(device, non_blocking=True)
+                text_inputs = list(captions)
 
                 # Extract the features, compute the logits and the loss
                 with torch.cuda.amp.autocast():
@@ -355,7 +355,7 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
                 for name, param in blip_model.named_parameters():
                     if param.requires_grad:
                         print(name, ",grad=",param.grad)
-                        
+
                 scaler.step(optimizer)
                 scaler.update()
 
