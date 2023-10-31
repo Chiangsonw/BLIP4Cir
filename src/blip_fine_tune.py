@@ -270,9 +270,9 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
     if encoder == 'text':
         print('Only the blip text encoder will be fine-tuned')
         for param in blip_model.parameters():
+            param.requires_grad = False
+        for param in blip_model.text_proj.parameters():
             param.requires_grad = True
-        # for param in blip_model.text_proj.parameters():
-        #     param.requires_grad = True
 
     blip_model.train().float()
 
@@ -331,9 +331,6 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
                 target_images = target_images.to(device, non_blocking=True)
                 text_inputs = list(captions)
 
-
-                print(len(text_inputs))
-
                 # Extract the features, compute the logits and the loss
                 with torch.cuda.amp.autocast():
 
@@ -342,6 +339,10 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
                     text_features = blip_model.extract_features({"text_input":text_inputs}, mode="text").text_embeds_proj[:,0,:]
 
                     predicted_features = F.normalize(combining_function(reference_features, text_features), dim=-1)
+                    print(predicted_features.max())
+                    print(predicted_features.min())
+                    print(target_features.max())
+                    print(target_features.min())
 
                     logits = predicted_features @ target_features.T
 
@@ -349,8 +350,12 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
                     loss = crossentropy_criterion(logits, ground_truth)
 
                 # Backpropagate and update the weights
+                    
+                for name, param in blip_model.named_parameters():
+                    if param.requires_grad:
+                        print(name, ",grad=",param.grad)
 
-                # loss.requires_grad_(True) 
+                loss.requires_grad_(True) 
                 scaler.scale(loss).backward()
                 scaler.step(optimizer)
                 scaler.update()
