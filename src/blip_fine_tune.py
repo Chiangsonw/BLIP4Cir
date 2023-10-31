@@ -274,7 +274,7 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
         for param in blip_model.text_proj.parameters():
             param.requires_grad = True
 
-    blip_model.train().float()
+    blip_model.eval().float()
 
 
     # Define the validation datasets
@@ -300,7 +300,7 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
     
     for name, param in blip_model.named_parameters():
         if param.requires_grad:
-            print(name)
+            print(name, ",grad=",param.grad)
 
     crossentropy_criterion = nn.CrossEntropyLoss()
     scaler = torch.cuda.amp.GradScaler()
@@ -338,13 +338,9 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
                     target_features = F.normalize(blip_model.extract_features({"image":target_images}, mode="image").image_embeds_proj[:,0,:], dim=-1)
                     text_features = blip_model.extract_features({"text_input":text_inputs}, mode="text").text_embeds_proj[:,0,:]
 
-                    predicted_features = F.normalize(combining_function(reference_features, text_features), dim=-1)
-                    print(predicted_features.max())
-                    print(predicted_features.min())
-                    print(target_features.max())
-                    print(target_features.min())
+                    predicted_features = combining_function(reference_features, text_features)
 
-                    logits = predicted_features @ target_features.T
+                    logits = 100 * predicted_features @ target_features.T
 
                     ground_truth = torch.arange(images_in_batch, dtype=torch.long, device=device)
                     loss = crossentropy_criterion(logits, ground_truth)
