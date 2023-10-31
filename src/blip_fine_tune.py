@@ -338,6 +338,8 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
                     target_features = F.normalize(blip_model.extract_features({"image":target_images}, mode="image").image_embeds_proj[:,0,:], dim=-1)
                     text_features = blip_model.extract_features({"text_input":text_inputs}, mode="text").text_embeds_proj[:,0,:]
 
+                    text_features.requires_grad = True
+                    
                     predicted_features = combining_function(reference_features, text_features)
 
                     logits = 100 * predicted_features @ target_features.T
