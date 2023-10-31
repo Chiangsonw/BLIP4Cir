@@ -337,29 +337,28 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
                     reference_features = blip_model.extract_features({"image":reference_images}, mode="image").image_embeds_proj[:,0,:]
                     target_features = F.normalize(blip_model.extract_features({"image":target_images}, mode="image").image_embeds_proj[:,0,:], dim=-1)
                     text_features = blip_model.extract_features({"text_input":text_inputs}, mode="text").text_embeds_proj[:,0,:]
-                    print("reference_features", reference_features.requires_grad)
-                    print("target_features", target_features.requires_grad)
-                    print("text_features", text_features.requires_grad)
+
                     reference_features.requires_grad = True
                     target_features.requires_grad = True
                     text_features.requires_grad = True
-                    print("reference_features", reference_features.requires_grad)
-                    print("target_features", target_features.requires_grad)
-                    print("text_features", text_features.requires_grad)
-                    
+                
+
                     predicted_features = combining_function(reference_features, text_features)
-                    print("predicted_features", predicted_features.requires_grad)
-                    
+
                     logits = 100 * predicted_features @ target_features.T
-                    print("logits", logits.requires_grad)
                     ground_truth = torch.arange(images_in_batch, dtype=torch.long, device=device)
                     loss = crossentropy_criterion(logits, ground_truth)
-                    print("loss", loss.requires_grad)
+
 
                 # Backpropagate and update the weights
                     
                 loss.requires_grad_(True) 
                 scaler.scale(loss).backward()
+                print("loss grad :",loss.grad)
+                print("logits grad :",logits.grad)
+                print("predicted grad :",predicted_features.grad)
+                print("text grad :",text_features.grad)
+                print("reference grad :",reference_features.grad)
 
                 for name, param in blip_model.named_parameters():
                     if param.requires_grad:
