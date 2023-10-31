@@ -270,11 +270,11 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
     if encoder == 'text':
         print('Only the blip text encoder will be fine-tuned')
         for param in blip_model.parameters():
-            param.requires_grad = False
-        for param in blip_model.text_proj.parameters():
             param.requires_grad = True
-        for param in blip_model.vision_proj.parameters():
-            param.requires_grad = True
+        # for param in blip_model.text_proj.parameters():
+        #     param.requires_grad = True
+        # for param in blip_model.vision_proj.parameters():
+        #     param.requires_grad = True
 
 
 
@@ -299,10 +299,6 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
         [{'params': filter(lambda p: p.requires_grad, blip_model.parameters()), 'lr': learning_rate,
           'betas': (0.9, 0.999), 'eps': 1e-7}])
     
-    for name, param in blip_model.named_parameters():
-        if param.requires_grad:
-            print(name, ",grad=",param.grad)
-
     crossentropy_criterion = nn.CrossEntropyLoss()
     scaler = torch.cuda.amp.GradScaler()
 
@@ -315,8 +311,6 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
     # Define dataframes for CSV logging
     training_log_frame = pd.DataFrame()
     validation_log_frame = pd.DataFrame()
-
-    torch.autograd.set_detect_anomaly(True)
 
     for epoch in range(num_epochs):
         with experiment.train():
@@ -346,10 +340,10 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
                     ground_truth = torch.arange(images_in_batch, dtype=torch.long, device=device)
                     # loss = crossentropy_criterion(logits, ground_truth)
                     loss = crossentropy_criterion(100 * combining_function(reference_features, text_features) @ target_features.T, ground_truth)
-
+                    
                 # Backpropagate and update the weights
                     
-                # loss.requires_grad_(True) 
+                loss.requires_grad_(True) 
                 scaler.scale(loss).backward()
                 print("text grad :",text_features.grad)
                 print("reference grad :",reference_features.grad)
