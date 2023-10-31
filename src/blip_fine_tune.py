@@ -345,7 +345,7 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
                     text_features.requires_grad = True
                     
                     predicted_features = combining_function(reference_features, text_features)
-                    
+                    predicted_features.requires_grad = True
                     print("predicted_features", predicted_features.requires_grad)
                     
                     logits = 100 * predicted_features @ target_features.T
