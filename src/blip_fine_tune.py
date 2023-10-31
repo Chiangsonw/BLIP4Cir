@@ -358,7 +358,9 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
                 print("predicted grad :",predicted_features.grad)
                 print("text grad :",text_features.grad)
                 print("reference grad :",reference_features.grad)
+                print("target grad :",target_features.grad)
 
+                
                 for name, param in blip_model.named_parameters():
                     if param.requires_grad:
                         print(name, ",grad=",param.grad)
