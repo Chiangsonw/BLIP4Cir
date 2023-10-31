@@ -19,8 +19,8 @@ from data_utils import base_path, squarepad_transform, FashionIQDataset, targetp
 from combiner import Combiner
 from utils import collate_fn, update_train_running_results, set_train_bar_description, save_model, \
     extract_index_features,extract_index_features_blip, generate_randomized_fiq_caption, device, generate_randomized_fiq_caption_blip,device_ids
-from validate import compute_cirr_val_metrics, compute_fiq_val_metrics
-from validate_blip import compute_fiq_val_metrics_blip,compute_cirr_val_metrics_blip
+from src.validate_blip import compute_cirr_val_metrics, compute_fiq_val_metrics
+from src.validate_blip_zyn import compute_fiq_val_metrics_blip,compute_cirr_val_metrics_blip
 
 from lavis.models import load_model_and_preprocess
 
