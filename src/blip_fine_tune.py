@@ -357,17 +357,19 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
 
                 # Extract the features, compute the logits and the loss
                 with torch.cuda.amp.autocast():
-                    with torch.autograd.detect_anomaly():
-                        reference_features = blip_model.extract_features({"image":reference_images}, mode="image").image_embeds_proj[:,0,:]
-                        target_features = F.normalize(blip_model.extract_features({"image":target_images}, mode="image").image_embeds_proj[:,0,:], dim=-1)
-                        text_features = blip_model.extract_features({"text_input":text_inputs}, mode="text").text_embeds_proj[:,0,:]
 
-                        predicted_features = F.normalize(combining_function(reference_features, text_features), dim=-1)
+                    reference_features = blip_model.extract_features({"image":reference_images}, mode="image").image_embeds_proj[:,0,:]
+                    target_features = F.normalize(blip_model.extract_features({"image":target_images}, mode="image").image_embeds_proj[:,0,:], dim=-1)
+                    text_features = blip_model.extract_features({"text_input":text_inputs}, mode="text").text_embeds_proj[:,0,:]
 
-                        logits = predicted_features @ target_features.T
+                    predicted_features = F.normalize(combining_function(reference_features, text_features), dim=-1)
 
-                        ground_truth = torch.arange(images_in_batch, dtype=torch.long, device=device)
-                        loss = crossentropy_criterion(logits, ground_truth)
+                    logits = predicted_features @ target_features.T
+
+                    ground_truth = torch.arange(images_in_batch, dtype=torch.long, device=device)
+                    loss = crossentropy_criterion(logits, ground_truth)
+                    print(loss.max())
+                    print(loss.min())
 
                 # Backpropagate and update the weights
                 with torch.autograd.detect_anomaly():
