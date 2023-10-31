@@ -297,6 +297,11 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
     optimizer = optim.AdamW(
         [{'params': filter(lambda p: p.requires_grad, blip_model.parameters()), 'lr': learning_rate,
           'betas': (0.9, 0.999), 'eps': 1e-7}])
+    
+    for name, param in blip_model.named_parameters():
+        if param.requires_grad:
+            print(name)
+
     crossentropy_criterion = nn.CrossEntropyLoss()
     scaler = torch.cuda.amp.GradScaler()
 
