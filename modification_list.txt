@@ -35,4 +35,6 @@
 29 debug Qformer.bert require_grad   loss .require_grad 
 
 30 test tac
+31 tac and finetune 
+
     

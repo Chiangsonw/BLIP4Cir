@@ -20,6 +20,7 @@ from utils import collate_fn, update_train_running_results, set_train_bar_descri
     extract_index_features,extract_index_features_blip, generate_randomized_fiq_caption, device, generate_randomized_fiq_caption_blip, element_wise_sum
 from validate_blip import compute_cirr_val_metrics, compute_fiq_val_metrics
 from lavis.models import load_model_and_preprocess
+from twin_attention_compositor import Twin_Attention_Compositor
 
 base_path = Path('/home/lmj/xintong/BLIP4Cir')
 
@@ -265,8 +266,9 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
 
     # blip_model, blip_preprocess = blip.load(blip_model_name, device=device, jit=False)
     blip_model, vis_processors, txt_processors = load_model_and_preprocess(name="blip2_feature_extractor", model_type="pretrain", is_eval=False, device=device)
-
-
+    tac = Twin_Attention_Compositor().to(device)
+    
+    
     if encoder == 'text':
         print('Only the blip text encoder will be fine-tuned')
         for param in blip_model.parameters():
@@ -277,7 +279,9 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
             param.requires_grad = True
         for param in blip_model.query_tokens.parameters():
             param.requires_grad = True
-
+        for param in tac.parameters():
+            param.require_grad = True
+        
 
     # Define the validation datasets
     relative_val_dataset = CIRRDataset('val', 'relative', vis_processors["eval"],txt_processors["eval"])
@@ -330,15 +334,25 @@ def blip_finetune_cirr(num_epochs: int, blip_model_name: str, learning_rate: flo
                 # Extract the features, compute the logits and the loss
                 with torch.cuda.amp.autocast():
 
-                    reference_features = blip_model.extract_features({"image":reference_images}, mode="image").image_embeds_proj[:,0,:]
-                    target_features = F.normalize(blip_model.extract_features({"image":target_images}, mode="image").image_embeds_proj[:,0,:], dim=-1)
-                    text_features = blip_model.extract_features({"text_input":text_inputs}, mode="text").text_embeds_proj[:,0,:]
+                    # reference_features = blip_model.extract_features({"image":reference_images}, mode="image").image_embeds_proj[:,0,:]
+                    # target_features = F.normalize(blip_model.extract_features({"image":target_images}, mode="image").image_embeds_proj[:,0,:], dim=-1)
 
-                    # predicted_features = combining_function(reference_features, text_features)
-                    # logits = 100 * predicted_features @ target_features.T
+                    reference_embeds = blip_model.extract_features({"image":reference_images}, mode="image").image_embeds_proj
+                    target_embeds = blip_model.extract_features({"image":target_images}, mode="image").image_embeds_proj
+                    reference_features = reference_embeds[:,0,:]
+                    target_features = F.normalize(target_embeds[:,0,:], dim=-1)
+                
+                    text_features = blip_model.extract_features({"text_input":text_inputs}, mode="text").text_embeds_proj[:,0,:]
+                    visual_diff = tac(reference_embeds, target_embeds)
+
+                    align_logits = 10 * text_features @ visual_diff.T
+
+                    predicted_features = combining_function(reference_features, text_features)
+                    contrast_logits = 100 * predicted_features @ target_features.T
                     ground_truth = torch.arange(images_in_batch, dtype=torch.long, device=device)
-                    # loss = crossentropy_criterion(logits, ground_truth)
-                    loss = crossentropy_criterion(100 * combining_function(reference_features, text_features) @ target_features.T, ground_truth)
+                    logits = align_logits * align_weight + (1 - align_weight) * contrast_logits 
+                    loss = crossentropy_criterion(logits, ground_truth)
+                    # loss = crossentropy_criterion(100 * combining_function(reference_features, text_features) @ target_features.T, ground_truth)
                     
                 # Backpropagate and update the weights
                 scaler.scale(loss).backward()
@@ -427,7 +441,7 @@ if __name__ == '__main__':
                         help="Whether save the training model")
     parser.add_argument("--save-best", dest="save_best", action='store_true',
                         help="Save only the best model during training")
-    # parser.add_argument("--device", dest="device", default='5', type=str, help="Set device")
+    parser.add_argument("--align-weight", default=0.1, type=float, help="align_loss weight")
 
     args = parser.parse_args()
     if args.dataset.lower() not in ['fashioniq', 'cirr']:
@@ -443,7 +457,8 @@ if __name__ == '__main__':
         "target_ratio": args.target_ratio,
         "save_training": args.save_training,
         "encoder": args.encoder,
-        "save_best": args.save_best
+        "save_best": args.save_best,
+        "align_weight": args.align_weight
     }
     if args.api_key and args.workspace:
         print("Comet logging ENABLED")
